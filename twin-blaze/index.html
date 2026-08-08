@@ -1,0 +1,1118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Twin Blaze — 2-Player Air Dogfight</title>
+<style>
+  /* TWIN BLAZE — responsive, self-contained 2P dogfight. Inline CSS, no external files. */
+  :root{ --cy:#22e6ff; --mg:#ff4fd8; --bg-dark:#04060f; }
+  *{ box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+  html,body{ height:100%; overflow:hidden; }
+  body{ font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg-dark); color:#dfe9ff; display:flex; align-items:center; justify-content:center; }
+  #wrap{ position:relative; width:100%; height:100%; display:flex; align-items:center; justify-content:center; }
+  canvas#game{ display:block; background:#04060f; touch-action:none; cursor:crosshair; box-shadow:0 0 40px rgba(34,230,255,.08), 0 0 40px rgba(255,79,216,.08); }
+  .overlay{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; z-index:20; transition:opacity .35s ease; }
+  .overlay.hidden{ opacity:0; pointer-events:none; }
+  .panel{ max-width:min(92vw,620px); max-height:92vh; overflow:auto; background:rgba(6,12,26,.9); border:1px solid rgba(255,255,255,.12); border-radius:18px; padding:30px 34px; text-align:center; backdrop-filter:blur(6px); box-shadow:0 0 60px rgba(0,0,0,.55), inset 0 0 40px rgba(80,140,255,.06); }
+  .panel h1{ font-size:clamp(2rem,7vw,3.4rem); letter-spacing:4px; background:linear-gradient(90deg,var(--cy),var(--mg)); -webkit-background-clip:text; background-clip:text; color:transparent; margin-bottom:6px; }
+  .subtitle{ opacity:.55; letter-spacing:2px; font-size:.85rem; margin-bottom:22px; }
+  .controls{ display:grid; grid-template-columns:auto 1fr; gap:10px 18px; text-align:left; margin:0 auto 24px; font-size:.95rem; border:1px solid rgba(255,255,255,.08); border-radius:12px; padding:16px 20px; background:rgba(255,255,255,.03); }
+  .controls .p1{ color:var(--cy); font-weight:700; }
+  .controls .p2{ color:var(--mg); font-weight:700; }
+  .controls .key{ display:inline-block; min-width:26px; text-align:center; border:1px solid rgba(255,255,255,.35); border-radius:6px; padding:2px 7px; font-size:.8rem; background:rgba(255,255,255,.08); font-weight:600; }
+  button{ font-family:inherit; font-size:1.05rem; letter-spacing:1px; color:#04101f; background:linear-gradient(90deg,var(--cy),#7ff2ff); border:none; border-radius:30px; padding:14px 34px; cursor:pointer; font-weight:800; box-shadow:0 4px 24px rgba(34,230,255,.35); transition:transform .12s, box-shadow .2s; }
+  button:hover{ transform:translateY(-2px); box-shadow:0 8px 34px rgba(34,230,255,.55); }
+  button.p2btn{ background:linear-gradient(90deg,var(--mg),#ffa1e8); box-shadow:0 4px 24px rgba(255,79,216,.35); }
+  button.p2btn:hover{ box-shadow:0 8px 34px rgba(255,79,216,.55); }
+  button.secondary{ background:rgba(255,255,255,.1); color:#fff; box-shadow:none; margin-top:12px; }
+  .arena-note{ font-size:.8rem; opacity:.6; margin-top:14px; line-height:1.6; }
+  /* AUTOPLAY demo toggle */
+  .switch-row{ display:flex; align-items:center; gap:12px; justify-content:center; margin:14px 0 4px; font-weight:700; letter-spacing:1px; font-size:.9rem; }
+  .switch-label.on{ color:var(--cy); }
+  .switch{ position:relative; width:52px; height:28px; cursor:pointer; }
+  .switch input{ opacity:0; width:0; height:0; }
+  .slider{ position:absolute; inset:0; background:#233252; border-radius:999px; transition:.2s; }
+  .slider::before{ content:""; position:absolute; height:22px; width:22px; left:3px; top:3px; background:#cfe0ff; border-radius:50%; transition:.2s; }
+  .switch input:checked + .slider{ background:var(--cy); }
+  .switch input:checked + .slider::before{ transform:translateX(24px); background:#062a25; }
+  .auto-hint{ font-size:.72rem; opacity:.55; margin-top:4px; letter-spacing:1px; }
+  .touch-pad{ position:absolute; z-index:15; display:none; width:118px; height:118px; border-radius:50%; background:rgba(255,255,255,.06); border:2px solid rgba(255,255,255,.12); backdrop-filter:blur(2px); }
+  .touch-pad .dot{ position:absolute; width:34px; height:34px; border-radius:50%; background:currentColor; opacity:.85; pointer-events:none; transform:translate(-50%,-50%); transition:left .05s, top .05s; }
+  #touchP1{ left:16px; bottom:16px; color:var(--cy); }
+  #touchP2{ right:16px; bottom:16px; color:var(--mg); }
+  .touch-fire{ position:absolute; z-index:15; display:none; width:76px; height:76px; border-radius:50%; background:rgba(255,255,255,.08); border:2px solid rgba(255,255,255,.2); color:#fff; font-weight:800; font-size:.8rem; letter-spacing:1px; align-items:center; justify-content:center; backdrop-filter:blur(2px); }
+  #fireP1{ left:150px; bottom:40px; color:var(--cy); border-color:var(--cy); }
+  #fireP2{ right:150px; bottom:40px; color:var(--mg); border-color:var(--mg); }
+  body.touch .touch-pad, body.touch .touch-fire{ display:flex; }
+  .corner-label{ position:absolute; z-index:16; display:none; font-size:.8rem; letter-spacing:2px; font-weight:700; opacity:.8; }
+  #labelP1{ left:14px; top:14px; color:var(--cy); }
+  #labelP2{ right:14px; top:14px; color:var(--mg); }
+  body.touch .corner-label{ display:block; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="game"></canvas>
+  <div class="touch-pad" id="touchP1"><div class="dot"></div></div>
+  <div class="touch-pad" id="touchP2"><div class="dot"></div></div>
+  <div class="touch-fire" id="fireP1">FIRE</div>
+  <div class="touch-fire" id="fireP2">FIRE</div>
+  <div class="corner-label" id="labelP1">P1</div>
+  <div class="corner-label" id="labelP2">P2</div>
+  <div class="overlay" id="startScreen">
+    <div class="panel">
+      <h1>TWIN&nbsp;BLAZE</h1>
+      <div class="subtitle">LOCAL 2-PLAYER AIR DOGFIGHT</div>
+      <div class="controls">
+        <span class="p1">PLAYER 1</span> <span><span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span> move &middot; <span class="key">F</span> fire</span>
+        <span class="p2">PLAYER 2</span> <span><span class="key">&uarr;</span><span class="key">&larr;</span><span class="key">&darr;</span><span class="key">&rarr;</span> move &middot; <span class="key">Space</span> fire</span>
+      </div>
+      <button id="startBtn">START BATTLE</button>
+      <div class="switch-row">
+        <span class="switch-label" id="label-autoplay">AUTOPLAY DEMO (AI vs AI)</span>
+        <label class="switch"><input type="checkbox" id="switch-autoplay" /><span class="slider"></span></label>
+      </div>
+      <div class="auto-hint">Toggle to watch two AI fighters duel (HOTKEY A)</div>
+      <div class="arena-note">First to <span id="winScore">5</span> points wins.<br/>Grab power-ups: rapid-fire, shield &amp; speed.<br/>On mobile: each player gets a touch pad + fire button.</div>
+    </div>
+  </div>
+  <div class="overlay hidden" id="controlsScreen">
+    <div class="panel">
+      <h1 style="font-size:1.6rem">CONTROLS</h1>
+      <div class="controls">
+        <span class="p1">PLAYER 1</span>
+        <span>Move: <span class="key">W</span>&uarr; <span class="key">A</span>&larr; <span class="key">S</span>&darr; <span class="key">D</span>&rarr; &nbsp;&middot;&nbsp; Fire: <span class="key">F</span></span>
+        <span class="p2">PLAYER 2</span>
+        <span>Move: <span class="key">&uarr;</span> <span class="key">&larr;</span> <span class="key">&darr;</span> <span class="key">&rarr;</span> &nbsp;&middot;&nbsp; Fire: <span class="key">Space</span></span>
+        <span>PAUSE</span> <span><span class="key">P</span> / <span class="key">Esc</span></span>
+        <span>RESET SCORE</span> <span>Hold <span class="key">R</span> in menu</span>
+      </div>
+      <button class="p2btn" id="controlsBack">BACK TO MENU</button>
+    </div>
+  </div>
+  <div class="overlay hidden" id="victoryScreen">
+    <div class="panel">
+      <h1 id="victoryTitle">PLAYER 1 WINS!</h1>
+      <div class="subtitle" id="victoryScore">Final score &mdash; 5 : 3</div>
+      <button id="rematchBtn">REMATCH</button>
+      <button class="secondary" id="menuBtn">MAIN MENU</button>
+    </div>
+  </div>
+</div>
+<script>
+"use strict";
+/* ============================================================ */
+/*  TWIN BLAZE - one-file local 2-player dogfight.              */
+/*  Vanilla JS: rAF loop, inline SVG sprites, math collision,  */
+/*  power-ups, round system, HUD, touch + keyboard.            */
+/* ============================================================ */
+
+/* 0. CANVAS SETUP ------------------------------------------- */
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const dpr = Math.min(window.devicePixelRatio || 1, 2);
+let W = 0, H = 0, cw, ch;
+
+function resize(){
+  const aspect = 4/3;
+  const vw = window.innerWidth, vh = window.innerHeight;
+  let cssW = vw, cssH = cssW / aspect;
+  if (cssH > vh){ cssH = vh; cssW = cssH * aspect; }
+  cw = cssW; ch = cssH;
+  canvas.style.width = cw + 'px';
+  canvas.style.height = ch + 'px';
+  canvas.width = cw * dpr;
+  canvas.height = ch * dpr;
+  W = cw; H = ch;
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+}
+window.addEventListener('resize', resize);
+
+const touchable = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+if (touchable) document.body.classList.add('touch');
+
+/* 1. INLINE SVG SPRITES ---------------------------------------- */
+/* Each sprite rendered once to an offscreen canvas; drawImage per frame. */
+const SPR = 96;
+
+function makeSprite(svgText, size){
+  const img = new Image();
+  img.src = 'data:image/svg+xml;utf8,' + encodeURIComponent(svgText);
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = size * dpr;
+  const c2 = cv.getContext('2d');
+  c2.scale(dpr,dpr);
+  return new Promise(res => {
+    img.onload = () => { c2.drawImage(img, 0, 0, size, size); res({img:cv, size}); };
+  });
+}
+
+/* ---- Fighter #1 "CyanViper" (P1) ---- */
+const svgP1 = `
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96">
+<defs>
+<linearGradient id="g1" x1="0" y1="0" x2="1" y2="0">
+<stop offset="0" stop-color="#9ff4ff"/><stop offset=".5" stop-color="#22e6ff"/><stop offset="1" stop-color="#0a8fd0"/>
+</linearGradient>
+<radialGradient id="eng" cx=".5" cy=".5" r=".5">
+<stop offset="0" stop-color="#ffffff"/><stop offset=".4" stop-color="#ffe44d"/><stop offset="1" stop-color="#ff7a00"/>
+</radialGradient>
+</defs>
+<path d="M30 36 L18 16 L36 40 Z" fill="#0a8fd0"/>
+<path d="M66 36 L78 16 L60 40 Z" fill="#0a8fd0"/>
+<path d="M48 42 L10 60 L18 66 L46 52 Z" fill="url(#g1)" stroke="#0a6f9f" stroke-width="1.5"/>
+<path d="M48 42 L86 60 L78 66 L50 52 Z" fill="url(#g1)" stroke="#0a6f9f" stroke-width="1.5"/>
+<path d="M48 8 Q54 30 48 78 Q45 84 40 76 L40 30 Q46 18 48 8 Z" fill="url(#g1)" stroke="#065f8c" stroke-width="1.5"/>
+<path d="M48 8 Q42 30 48 78 Q51 84 56 76 L56 30 Q50 18 48 8 Z" fill="#9ff4ff" opacity=".5"/>
+<ellipse cx="48" cy="34" rx="6" ry="10" fill="#0b2540" stroke="#4be8ff" stroke-width="1.2"/>
+<ellipse cx="47" cy="31" rx="2.4" ry="4" fill="#aef6ff" opacity=".85"/>
+<ellipse cx="40" cy="80" rx="5" ry="4" fill="#1a7fb0"/>
+<ellipse cx="56" cy="80" rx="5" ry="4" fill="#1a7fb0"/>
+<ellipse cx="40" cy="86" rx="3.5" ry="5" fill="url(#eng)"/>
+<ellipse cx="56" cy="86" rx="3.5" ry="5" fill="url(#eng)"/>
+<circle cx="12" cy="60" r="2.2" fill="#7dfcff"/>
+<circle cx="84" cy="60" r="2.2" fill="#7dfcff"/>
+<rect x="45" y="2" width="3" height="10" fill="#0a6f9f"/>
+<rect x="48" y="2" width="3" height="10" fill="#0a6f9f"/>
+</svg>`;
+
+/* ---- Fighter #2 "MagmaRaptor" (P2) ---- */
+const svgP2 = `
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96">
+<defs>
+<linearGradient id="g2" x1="0" y1="0" x2="1" y2="0">
+<stop offset="0" stop-color="#ffb3e8"/><stop offset=".5" stop-color="#ff4fd8"/><stop offset="1" stop-color="#c11fb0"/>
+</linearGradient>
+</defs>
+<path d="M32 34 L16 52 L40 44 Z" fill="#c11fb0"/>
+<path d="M64 34 L80 52 L56 44 Z" fill="#c11fb0"/>
+<path d="M48 40 L8 48 L14 44 L20 62 L30 64 L44 50 Z" fill="url(#g2)" stroke="#a11490" stroke-width="1.5"/>
+<path d="M48 40 L88 48 L82 44 L76 62 L66 64 L52 50 Z" fill="url(#g2)" stroke="#a11490" stroke-width="1.5"/>
+<path d="M48 6 Q54 32 48 80 Q44 88 38 78 L38 30 Q46 16 48 6 Z" fill="url(#g2)" stroke="#8f0d7d" stroke-width="1.5"/>
+<path d="M48 6 Q42 32 48 80 Q52 88 58 78 L58 30 Q50 16 48 6 Z" fill="#ff9be8" opacity=".5"/>
+<ellipse cx="48" cy="30" rx="7" ry="11" fill="#2b0a2e" stroke="#ff7de4" stroke-width="1.2"/>
+<path d="M44 24 Q47 19 52 24 Q49 22 44 24 Z" fill="#ffd9f6" opacity=".9"/>
+<path d="M45 76 L48 90 L51 76 Q49.5 88 48 90 Q46.5 88 45 76 Z" fill="#c11fb0"/>
+<ellipse cx="48" cy="92" rx="4" ry="5" fill="#ff5a00"/>
+<ellipse cx="48" cy="95" rx="3" ry="4" fill="#ffd000"/>
+<rect x="7" y="44" width="5" height="12" rx="2" fill="#8f0d7d"/>
+<rect x="84" y="44" width="5" height="12" rx="2" fill="#8f0d7d"/>
+<rect x="6" y="50" width="2" height="3" fill="#ff8de0"/>
+<rect x="88" y="50" width="2" height="3" fill="#ff8de0"/>
+</svg>`;
+
+/* ---- Bullet sprite (param color) ---- */
+const mkBullet = col => `
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96">
+<defs><radialGradient id="bl" cx=".5" cy=".5" r=".5">
+<stop offset="0" stop-color="#ffffff"/><stop offset=".5" stop-color="${col}"/><stop offset="1" stop-color="#00000000"/>
+</radialGradient></defs>
+<ellipse cx="48" cy="48" rx="8" ry="20" fill="url(#bl)"/>
+<ellipse cx="48" cy="38" rx="4" ry="10" fill="#ffffff" opacity=".9"/>
+</svg>`;
+
+/* ---- Power-up icons ---- */
+const svgRapid = `
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96">
+<circle cx="48" cy="48" r="26" fill="#101f33" stroke="#ffd94d" stroke-width="3"/>
+<path d="M48 30 L48 56 M36 38 L60 44 M36 58 L60 52" stroke="#ffd94d" stroke-width="5" stroke-linecap="round"/>
+<path d="M30 20 L36 26 M66 20 L60 26 M36 74 L30 80 M66 74 L60 80" stroke="#ff9d2e" stroke-width="4" stroke-linecap="round"/>
+</svg>`;
+
+const svgShield = `
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96">
+<circle cx="48" cy="48" r="26" fill="#101f33" stroke="#33e6ff" stroke-width="3"/>
+<path d="M48 28 L48 68 M28 40 L68 42 M32 58 L64 56" stroke="#33e6ff" stroke-width="6" stroke-linecap="round"/>
+<path d="M38 30 L58 66" stroke="#7dfcff" stroke-width="3" stroke-linecap="round" opacity=".7"/>
+<path d="M58 30 L38 66" stroke="#194f66" stroke-width="3" stroke-linecap="round" opacity=".7"/>
+</svg>`;
+
+const svgSpeed = `
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96">
+<circle cx="48" cy="48" r="26" fill="#101f33" stroke="#5bff7a" stroke-width="3"/>
+<path d="M34 30 L62 26 L58 54 L30 58 L34 30 Z" fill="#5bff7a" opacity=".9"/>
+<path d="M38 58 L52 72 M56 40 L70 26" stroke="#a6ffb8" stroke-width="4" stroke-linecap="round"/>
+</svg>`;
+
+const sprites = {};
+const compile = {
+  p1: makeSprite(svgP1, SPR),
+  p2: makeSprite(svgP2, SPR),
+  b1: makeSprite(mkBullet('#37e8ff'), SPR),
+  b2: makeSprite(mkBullet('#ff6de0'), SPR),
+  rapid: makeSprite(svgRapid, SPR),
+  shield: makeSprite(svgShield, SPR),
+  speed: makeSprite(svgSpeed, SPR)
+};
+for (const [k,p] of Object.entries(compile)){ p.then(v => { sprites[k] = v; }); }
+let spritesReady = false;
+Promise.all(Object.values(compile)).then(()=>{ spritesReady = true; });
+
+/* 2. CONFIG & STATE -------------------------------------------- */
+const cfg = {
+  winScore: 5,
+  planeSize: 34,
+  moveSpeed: 260,
+  speedBoostMul: 1.45,
+  bulletSpeed: 520,
+  bulletSize: 10,
+  fireCooldown: 0.42,
+  rapidFireCooldown: 0.16,
+  rapidShotsMax: 12,
+  shieldDuration: 4.5,
+  speedDuration: 5,
+  rapidDuration: 6,
+  powerupInterval: 6,
+  maxPowerups: 4,
+  fireCol: 1.6
+};
+
+const KEYS = {
+  p1:{ W:false,A:false,S:false,D:false,F:false,F_pressed:false },
+  p2:{ UP:false,DOWN:false,LEFT:false,RIGHT:false,SPACE:false,SPACE_pressed:false }
+};
+
+let gameState = 'menu';
+let autoplay = false;
+let score = [0,0];
+let round = 0;
+let planes = [null,null];
+let bullets = [];
+let powerups = [];
+let particles = [];
+let effects = [];
+let shake = 0;
+let time = 0;
+let lastT = 0;
+let powerupTimer = 0;
+let roundActive = false;
+let roundTimer = 0;
+
+function makePlane(side){
+  return {
+    side,
+    x: side===0 ? W*0.32 : W*0.68,
+    y: side===0 ? H*0.72 : H*0.28,
+    vx:0, vy:0,
+    hp: 4,
+    angle: side===0 ? -Math.PI/2 : Math.PI/2,
+    fireCd: 0,
+    rapid: 0, rapidEnd: 0,
+    shield: 0,
+    speed: 0, speedEnd: 0,
+    invuln: 1.2,
+    dead: false, bulletBounce: 0
+  };
+}
+
+function startRound(first){
+  round = first ? 1 : round + 1;
+  bullets = []; powerups = []; particles = [];
+  planes[0] = makePlane(0);
+  planes[1] = makePlane(1);
+  powerupTimer = cfg.powerupInterval;
+  roundActive = true;
+  roundTimer = 0;
+  spawnText('ROUND ' + round, W/2, H/2 - 60, '#ffffff', 1.8, 34);
+}
+
+/* 3. INPUT: KEYBOARD ------------------------------------------- */
+window.addEventListener('keydown', e => {
+  const k = e.key;
+  if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(k)) e.preventDefault();
+  if (k==='p'||k==='P'||k==='Escape'){
+    if (gameState==='playing' && roundActive) gameState='paused';
+    else if (gameState==='paused') gameState='playing';
+    return;
+  }
+  // A toggles autoplay demo (also a P1 movement key; toggle on press only)
+  if ((k==='a'||k==='A') && !e.repeat){ toggleAutoplay(); }
+  switch(k){
+    case 'w': case 'W': KEYS.p1.W=true; break;
+    case 'a': case 'A': KEYS.p1.A=true; break;
+    case 's': case 'S': KEYS.p1.S=true; break;
+    case 'd': case 'D': KEYS.p1.D=true; break;
+    case 'f': case 'F': if(!KEYS.p1.F) KEYS.p1.F_pressed=true; KEYS.p1.F=true; break;
+    case 'ArrowUp': KEYS.p2.UP=true; break;
+    case 'ArrowDown': KEYS.p2.DOWN=true; break;
+    case 'ArrowLeft': KEYS.p2.LEFT=true; break;
+    case 'ArrowRight': KEYS.p2.RIGHT=true; break;
+    case ' ': if(!KEYS.p2.SPACE) KEYS.p2.SPACE_pressed=true; KEYS.p2.SPACE=true; break;
+  }
+  if ((k==='r'||k==='R') && gameState==='menu') score=[0,0];
+});
+
+window.addEventListener('keyup', e => {
+  switch(e.key){
+    case 'w': case 'W': KEYS.p1.W=false; break;
+    case 'a': case 'A': KEYS.p1.A=false; break;
+    case 's': case 'S': KEYS.p1.S=false; break;
+    case 'd': case 'D': KEYS.p1.D=false; break;
+    case 'f': case 'F': KEYS.p1.F=false; break;
+    case 'ArrowUp': KEYS.p2.UP=false; break;
+    case 'ArrowDown': KEYS.p2.DOWN=false; break;
+    case 'ArrowLeft': KEYS.p2.LEFT=false; break;
+    case 'ArrowRight': KEYS.p2.RIGHT=false; break;
+    case ' ': KEYS.p2.SPACE=false; break;
+  }
+});
+
+/* 4. INPUT: TOUCH ------------------------------------------------ */
+const touchP1 = { active:false, dx:0, dy:0, fire:false };
+const touchP2 = { active:false, dx:0, dy:0, fire:false };
+
+function bindTouchPad(pad, st){
+  pad.addEventListener('touchstart', e => { e.preventDefault(); st.active=true; updatePad(e,st,pad); }, {passive:false});
+  pad.addEventListener('touchmove', e => { e.preventDefault(); if(st.active) updatePad(e,st,pad); }, {passive:false});
+  const reset = e => { e.preventDefault(); st.active=false; st.dx=0; st.dy=0;
+    pad.querySelector('.dot').style.left='50%'; pad.querySelector('.dot').style.top='50%'; };
+  pad.addEventListener('touchend', reset, {passive:false});
+  pad.addEventListener('touchcancel', reset, {passive:false});
+}
+
+function updatePad(e, st, pad){
+  const t = e.touches[0];
+  const r = pad.getBoundingClientRect();
+  const cx = r.left + r.width/2, cy = r.top + r.height/2;
+  st.dx = (t.clientX - cx) / (r.width/2);
+  st.dy = (t.clientY - cy) / (r.height/2);
+  const mag = Math.hypot(st.dx, st.dy);
+  if (mag>1){ st.dx/=mag; st.dy/=mag; }
+  const dot = pad.querySelector('.dot');
+  dot.style.left = (50 + st.dx*40) + '%';
+  dot.style.top = (50 + st.dy*40) + '%';
+}
+
+function bindFire(elm, st){
+  elm.addEventListener('touchstart', e => { e.preventDefault(); st.fire=true; }, {passive:false});
+  elm.addEventListener('touchmove', e => { e.preventDefault(); }, {passive:false});
+  elm.addEventListener('touchend', e => { e.preventDefault(); st.fire=false; }, {passive:false});
+  elm.addEventListener('touchcancel', e => { e.preventDefault(); st.fire=false; }, {passive:false});
+}
+if (document.getElementById('touchP1')) bindTouchPad(document.getElementById('touchP1'), touchP1);
+if (document.getElementById('touchP2')) bindTouchPad(document.getElementById('touchP2'), touchP2);
+if (document.getElementById('fireP1')) bindFire(document.getElementById('fireP1'), touchP1);
+if (document.getElementById('fireP2')) bindFire(document.getElementById('fireP2'), touchP2);
+
+/* 5. OVERLAY HELPERS -------------------------------------------- */
+const $ = id => document.getElementById(id);
+function showOverlay(id){ $(id).classList.remove('hidden'); }
+function hideOverlay(id){ $(id).classList.add('hidden'); }
+function hideAllOverlays(){ ['startScreen','controlsScreen','victoryScreen'].forEach(hideOverlay); }
+
+/* 6. EFFECTS ----------------------------------------------------- */
+function spawnText(txt, x, y, color, dur, size, vy){
+  effects.push({ type:'text', txt, x, y, color, t:0, dur:dur||1.2, size:size||24, vy:vy||-40 });
+}
+function spawnRing(x, y, color, dur){
+  effects.push({ type:'ring', x, y, color, t:0, dur:dur||0.6 });
+}
+function spawnBurst(x, y, color, n){
+  for (let i=0;i<n;i++){
+    const a = Math.random()*Math.PI*2, s = 80+Math.random()*220;
+    particles.push({ x, y, vx:Math.cos(a)*s, vy:Math.sin(a)*s, t:0, dur:0.5+Math.random()*0.4,
+                     size:2+Math.random()*3, color });
+  }
+}
+
+/* 6.5 AUTOPLAY DEMO (AI vs AI) ---------------------------------- */
+function toggleAutoplay(){
+  autoplay = !autoplay;
+  const sw = document.getElementById('switch-autoplay');
+  const lbl = document.getElementById('label-autoplay');
+  if (sw) sw.checked = autoplay;
+  if (lbl) lbl.classList.toggle('on', autoplay);
+  // notify via HUD text if in battle
+  if (gameState==='playing' && planes[0] && planes[1]){
+    spawnText(autoplay? 'AUTOPLAY ON' : 'MANUAL MODE', W/2, H/2-40, autoplay?'#22e6ff':'#fff', 1.0, 20);
+  }
+}
+function updateAutoplayLabel(){
+  const sw = document.getElementById('switch-autoplay');
+  const lbl = document.getElementById('label-autoplay');
+  if (!sw || !lbl) return;
+  lbl.classList.toggle('on', sw.checked);
+}
+// A simple dogfight AI: chase the opponent, keep a small offset, dodge bullets a bit, fire when facing/close.
+function botControl(p, dt, enemyPlane){
+  const dx = enemyPlane.x - p.x;
+  const dy = enemyPlane.y - p.y;
+  const d = Math.hypot(dx, dy) || 1;
+  // strafe / hold a preferred standoff distance
+  const standoff = 220;
+  let mx, my;
+  if (d > standoff * 1.15) { mx = dx/d; my = dy/d; }        // close in
+  else if (d < standoff * 0.6) { mx = -dx/d; my = -dy/d; }  // back off
+  else { // orbit perpendicular for a lively duel
+    const orbit = Math.sin(p.side===0 ? time*0.7 : -time*0.7) > 0;
+    mx = orbit ? -dy/d : dy/d;
+    my = orbit ? dx/d : -dx/d;
+  }
+  // dodge incoming enemy bullets
+  let dvx=0, dvy=0;
+  for (const b of bullets){
+    if (b.side === p.side) continue;
+    const bd = Math.hypot(b.x-p.x, b.y-p.y);
+    if (bd < 110 && bd > 0.01){
+      const push = (110-bd)/110;
+      dvx -= (b.x-p.x)/bd * push * 2.2;
+      dvy -= (b.y-p.y)/bd * push * 2.2;
+    }
+  }
+  mx += dvx; my += dvy;
+  const mag = Math.hypot(mx,my) || 1;
+  const spd = cfg.moveSpeed * (p.speed>0 ? cfg.speedBoostMul : 1);
+  p.vx = (mx/mag) * spd;
+  p.vy = (my/mag) * spd;
+  p.x += p.vx*dt; p.y += p.vy*dt;
+  const m = 26;
+  p.x = Math.max(m, Math.min(W-m, p.x));
+  p.y = Math.max(m, Math.min(H-m, p.y));
+  // face the enemy
+  const target = Math.atan2(dy, dx);
+  let diff = target - p.angle;
+  while (diff > Math.PI) diff -= Math.PI*2;
+  while (diff < -Math.PI) diff += Math.PI*2;
+  p.angle += diff * 8 * dt;
+  return Math.hypot(dx,dy) < 440; // wantFire when close enough
+}
+
+/* 7. GAME LOGIC ----------------------------------------------------- */
+
+function updateMovement(p, dt){
+  let dx=0, dy=0;
+  if (p.side===0){
+    if (KEYS.p1.W) dy-=1;
+    if (KEYS.p1.S) dy+=1;
+    if (KEYS.p1.A) dx-=1;
+    if (KEYS.p1.D) dx+=1;
+  } else {
+    if (KEYS.p2.UP) dy-=1;
+    if (KEYS.p2.DOWN) dy+=1;
+    if (KEYS.p2.LEFT) dx-=1;
+    if (KEYS.p2.RIGHT) dx+=1;
+  }
+  // touch overrides keyboard when active
+  const t = p.side===0 ? touchP1 : touchP2;
+  if (t.active){ dx = t.dx; dy = t.dy; }
+
+  const mag = Math.hypot(dx,dy);
+  if (mag>1){ dx/=mag; dy/=mag; }
+
+  const spd = cfg.moveSpeed * (p.speed>0 ? cfg.speedBoostMul : 1);
+  p.vx = dx * spd;
+  p.vy = dy * spd;
+  p.x += p.vx * dt;
+  p.y += p.vy * dt;
+
+  // clamp to arena with soft margin
+  const m = 26;
+  p.x = Math.max(m, Math.min(W-m, p.x));
+  p.y = Math.max(m, Math.min(H-m, p.y));
+
+  // face travel direction (smooth interpolation)
+  if (mag > 0.05){
+    const target = Math.atan2(dy, dx);
+    let diff = target - p.angle;
+    while (diff > Math.PI) diff -= Math.PI*2;
+    while (diff < -Math.PI) diff += Math.PI*2;
+    p.angle += diff * 8 * dt;
+  }
+
+  // engine trail particles
+  if (Math.random() < 0.55){
+    const bx = p.x - Math.cos(p.angle)*20, by = p.y - Math.sin(p.angle)*20;
+    const tint = p.side===0 ? 'rgba(34,230,255,' : 'rgba(255,79,216,';
+    particles.push({ x:bx, y:by, vx:(Math.random()-0.5)*20, vy:(Math.random()-0.5)*20,
+                     t:0, dur:0.3+Math.random()*0.2, size:2+Math.random()*3,
+                     color: tint + (0.25+Math.random()*0.35) + ')' });
+  }
+}
+
+function tryFire(p, dt, fireHeld){
+  p.fireCd -= dt;
+  const cd = p.rapid>0 ? cfg.rapidFireCooldown : cfg.fireCooldown;
+  if (fireHeld && p.fireCd<=0){
+    p.fireCd = cd;
+    const mx = p.x + Math.cos(p.angle)*cfg.fireCol*cfg.planeSize*0.5;
+    const my = p.y + Math.sin(p.angle)*cfg.fireCol*cfg.planeSize*0.5;
+    const a = p.angle;
+    bullets.push({ x:mx, y:my, vx:Math.cos(a)*cfg.bulletSpeed, vy:Math.sin(a)*cfg.bulletSpeed,
+                   side: p.side, r:cfg.bulletSize, alive:true, t:0 });
+    if (p.rapid>0){ p.rapid--; if (p.rapid<=0) p.rapidEnd=0; }
+    spawnBurst(mx, my, p.side===0 ? '#7dfcff' : '#ff9be8', 3);
+    p.x -= Math.cos(a)*2; p.y -= Math.sin(a)*2;
+  }
+}
+
+/* --- Power-up spawning & pickup --- */
+const POWERUP_TYPES = ['rapid','shield','speed'];
+function spawnPowerUp(){
+  if (powerups.length >= cfg.maxPowerups) return;
+  const type = POWERUP_TYPES[Math.floor(Math.random()*POWERUP_TYPES.length)];
+  // choose a position away from both planes
+  let x=0, y=0, tries=0;
+  do {
+    x = 60 + Math.random()*(W-120);
+    y = 60 + Math.random()*(H-120);
+    const d0 = Math.hypot(x-planes[0].x, y-planes[0].y);
+    const d1 = Math.hypot(x-planes[1].x, y-planes[1].y);
+    if (d0>70 && d1>70) break;
+    tries++;
+  } while (tries<20);
+  powerups.push({ x, y, type, t:0, alive:true, spin:0, bob:Math.random()*Math.PI*2 });
+}
+
+function applyPowerUp(p, type){
+  const other = planes[p.side===0?1:0];
+  const col = p.side===0 ? '#7dfcff' : '#ff9be8';
+  switch(type){
+    case 'rapid':
+      p.rapid = cfg.rapidShotsMax;
+      p.rapidEnd = time + cfg.rapidDuration;
+      spawnText('RAPID FIRE', p.x, p.y-40, '#ffd94d', 1.0, 20);
+      break;
+    case 'shield':
+      p.shield = time + cfg.shieldDuration;
+      spawnText('SHIELD', p.x, p.y-40, '#33e6ff', 1.0, 20);
+      spawnRing(p.x, p.y, '#33e6ff', 0.8);
+      break;
+    case 'speed':
+      p.speed = time + cfg.speedDuration;
+      p.speedEnd = time + cfg.speedDuration;
+      spawnText('SPEED BOOST', p.x, p.y-40, '#5bff7a', 1.0, 20);
+      break;
+  }
+  spawnBurst(p.x, p.y, col, 10);
+}
+
+/* --- Collision detection & scoring --- */
+function handleCollisions(dt){
+  const p1 = planes[0], p2 = planes[1];
+  const half = cfg.planeSize*0.5;
+
+  // bullet vs plane
+  for (let i=bullets.length-1; i>=0; i--){
+    const b = bullets[i];
+    if (!b.alive) { bullets.splice(i,1); continue; }
+    // advance beyond bounds -> kill
+    if (b.x < -30 || b.x > W+30 || b.y < -30 || b.y > H+30){
+      b.alive = false; bullets.splice(i,1); continue;
+    }
+    b.x += b.vx*dt; b.y += b.vy*dt; b.t += dt;
+    // collide against the OPPONENT plane
+    const target = b.side===0 ? p2 : p1;
+    if (target && !target.dead){
+      const d = Math.hypot(b.x-target.x, b.y-target.y);
+      const hitR = half + b.r;
+      if (d < hitR && target.invuln <= 0){
+        b.alive = false;
+        // apply damage / scoring
+        if (target.shield > time){
+          // shield absorbs the hit
+          spawnBurst(b.x, b.y, '#33e6ff', 8);
+          spawnText('BLOCKED', target.x, target.y-40, '#33e6ff', 0.8, 16);
+          target.shield = 0; // shield pops after one hit
+        } else {
+          target.hp--;
+          spawnBurst(b.x, b.y, b.side===0 ? '#22e6ff' : '#ff4fd8', 12);
+          shake = Math.min(1, shake + 0.4);
+          if (target.hp <= 0){
+            onPlaneDestroyed(b.side);
+          } else {
+            spawnText('HIT!', target.x, target.y-40, '#ff5555', 0.8, 18);
+          }
+        }
+        bullets.splice(i,1);
+      }
+    }
+  }
+
+  // plane vs power-up pickup
+  for (const p of [p1, p2]){
+    if (!p || p.dead) continue;
+    for (let j=powerups.length-1; j>=0; j--){
+      const pu = powerups[j];
+      if (!pu.alive) { powerups.splice(j,1); continue; }
+      const d = Math.hypot(p.x-pu.x, p.y-pu.y);
+      if (d < half + 22){
+        pu.alive = false;
+        applyPowerUp(p, pu.type);
+        powerups.splice(j,1);
+      }
+    }
+  }
+}
+
+function onPlaneDestroyed(shooterSide){
+  // shooter scores a point; victim is dead; round ends or match ends
+  score[shooterSide]++;
+  const victim = planes[shooterSide===0?1:0];
+  victim.dead = true;
+  victim.hp = 0;
+  spawnBurst(victim.x, victim.y, shooterSide===0 ? '#22e6ff' : '#ff4fd8', 30);
+  spawnRing(victim.x, victim.y, shooterSide===0 ? '#22e6ff' : '#ff4fd8', 1.0);
+  shake = 1;
+  spawnText('P'+(shooterSide+1)+' SCORES!', W/2, H/2 - 20, shooterSide===0 ? '#22e6ff' : '#ff4fd8', 1.5, 32);
+  roundActive = false;
+  roundTimer = 1.6; // pause before next round
+}
+
+/* --- Round / match end handling --- */
+function endRound(){
+  // check victory
+  if (score[0] >= cfg.winScore || score[1] >= cfg.winScore){
+    gameState = 'victory';
+    const winner = score[0] > score[1] ? 0 : 1;
+    $('victoryTitle').textContent = 'PLAYER ' + (winner+1) + ' WINS!';
+    $('victoryTitle').style.color = winner===0 ? 'var(--cy)' : 'var(--mg)';
+    $('victoryScore').textContent = 'Final score — ' + score[0] + ' : ' + score[1];
+    showOverlay('victoryScreen');
+  } else {
+    // next round automatically after fade
+    roundTimer = 1.2;
+    roundActive = false;
+  }
+}
+
+/* status effect expiry */
+function updateStatus(p, dt){
+  if (p.rapid>0 && time >= p.rapidEnd){ p.rapid=0; }
+  if (p.shield>0 && time >= p.shield){ p.shield=0; spawnRing(p.x,p.y,'#33e6ff',0.4); }
+  if (p.speed>0 && time >= p.speedEnd){ p.speed=0; }
+  if (p.invuln>0) p.invuln -= dt;
+  if (p.dead){
+    // fade explosion particles continue
+    p.x += p.vx*dt*0.2; p.y += p.vy*dt*0.2;
+  }
+}
+
+/* --- Main update step --- */
+function update(dt){
+  time += dt;
+  if (shake>0) shake = Math.max(0, shake - dt*2);
+
+  // update effects & particles always (even in menu, for bg life)
+  for (let i=effects.length-1; i>=0; i--){
+    const e = effects[i];
+    e.t += dt;
+    if (e.type==='text'){ e.y += (e.vy||-40)*dt; }
+    if (e.t >= e.dur) effects.splice(i,1);
+  }
+  for (let i=particles.length-1; i>=0; i--){
+    const p = particles[i];
+    p.t += dt;
+    p.x += p.vx*dt; p.y += p.vy*dt;
+    p.vx *= 0.98; p.vy *= 0.98;
+    if (p.t >= p.dur) particles.splice(i,1);
+  }
+
+  if (gameState==='victory') return;
+  if (gameState==='playing' || gameState==='menu'){
+    if (planes[0] && planes[1]){
+      if (roundActive){
+        // move & fire both planes
+        for (const p of planes){
+          if (p.dead) continue;
+          let fireHeld;
+          if (autoplay){
+            // AI controls BOTH fighters (demo / spectator mode)
+            const enemy = planes[p.side===0 ? 1 : 0];
+            fireHeld = (enemy && !enemy.dead) ? botControl(p, dt, enemy) : false;
+          } else {
+            updateMovement(p, dt);
+            fireHeld = p.side===0 ? (KEYS.p1.F || touchP1.fire) : (KEYS.p2.SPACE || touchP2.fire);
+          }
+          tryFire(p, dt, fireHeld);
+          updateStatus(p, dt);
+        }
+        // power-up spawning
+        powerupTimer -= dt;
+        if (powerupTimer <= 0){
+          spawnPowerUp();
+          powerupTimer = cfg.powerupInterval;
+        }
+        // power-up animation (bob & spin)
+        for (const pu of powerups){ pu.t += dt; pu.spin += dt*2; pu.bob += dt*1.5; }
+        handleCollisions(dt);
+      } else {
+        // round transition countdown
+        roundTimer -= dt;
+        if (roundTimer <= 0){
+          if (score[0] >= cfg.winScore || score[1] >= cfg.winScore){
+            gameState = 'victory';
+            const winner = score[0] > score[1] ? 0 : 1;
+            $('victoryTitle').textContent = 'PLAYER ' + (winner+1) + ' WINS!';
+            $('victoryTitle').style.color = winner===0 ? 'var(--cy)' : 'var(--mg)';
+            $('victoryScore').textContent = 'Final score — ' + score[0] + ' : ' + score[1];
+            showOverlay('victoryScreen');
+          } else if (planes[0].dead || planes[1].dead){
+            startRound(false);
+          } else {
+            roundActive = true;
+          }
+        }
+      }
+    }
+  }
+  // drain pressed-single-shot flags
+  KEYS.p1.F_pressed = false;
+  KEYS.p2.SPACE_pressed = false;
+}
+
+/* 8. RENDERING ---------------------------------------------------- */
+
+/* --- Background: nebula + grid --- */
+// Pre-render static nebula once (perf-friendly)
+let bgCanvas = null;
+function buildBackground(){
+  bgCanvas = document.createElement('canvas');
+  bgCanvas.width = W*dpr; bgCanvas.height = H*dpr;
+  const b = bgCanvas.getContext('2d');
+  b.scale(dpr,dpr);
+
+  // deep space base gradient
+  const g = b.createRadialGradient(W/2, H*0.4, 0, W/2, H*0.4, Math.max(W,H)*0.7);
+  g.addColorStop(0, '#0a152a');
+  g.addColorStop(0.5, '#060b18');
+  g.addColorStop(1, '#02040a');
+  b.fillStyle = g;
+  b.fillRect(0,0,W,H);
+
+  // faint nebula clouds
+  for (let i=0;i<8;i++){
+    const nx = Math.random()*W, ny = Math.random()*H;
+    const r = 60 + Math.random()*180;
+    const ng = b.createRadialGradient(nx,ny,0,nx,ny,r);
+    const hue = Math.random()<0.5 ? '34,230,255' : '255,79,216';
+    ng.addColorStop(0, 'rgba(' + hue + ',0.04)');
+    ng.addColorStop(1, 'rgba(' + hue + ',0)');
+    b.fillStyle = ng;
+    b.fillRect(nx-r, ny-r, r*2, r*2);
+  }
+
+  // grid lines (subtle)
+  b.strokeStyle = 'rgba(100,160,255,0.045)';
+  b.lineWidth = 1;
+  const gs = 40;
+  b.beginPath();
+  for (let x=0; x<=W; x+=gs){ b.moveTo(x,0); b.lineTo(x,H); }
+  for (let y=0; y<=H; y+=gs){ b.moveTo(0,y); b.lineTo(W,y); }
+  b.stroke();
+
+  // sparse distant stars (tiny dots)
+  for (let i=0;i<200;i++){
+    b.fillStyle = 'rgba(255,255,255,' + (Math.random()*0.5+0.1).toFixed(2) + ')';
+    const sx = Math.random()*W, sy = Math.random()*H, sr = Math.random()*1.2+0.2;
+    b.beginPath(); b.arc(sx, sy, sr, 0, Math.PI*2); b.fill();
+  }
+
+  // vignette
+  const vg = b.createRadialGradient(W/2,H/2, Math.min(W,H)*0.3, W/2,H/2, Math.max(W,H)*0.75);
+  vg.addColorStop(0, 'rgba(0,0,0,0)');
+  vg.addColorStop(1, 'rgba(0,0,0,0.55)');
+  b.fillStyle = vg;
+  b.fillRect(0,0,W,H);
+}
+
+function drawBackground(){
+  if (!bgCanvas) buildBackground();
+  ctx.drawImage(bgCanvas, 0, 0, W, H);
+}
+
+/* --- Sprites --- */
+function drawSprite(spr, x, y, w, h, rot){
+  if (!spr) return;
+  ctx.save();
+  ctx.translate(x, y);
+  if (rot) ctx.rotate(rot + Math.PI/2); // sprites face "up" by default; rotate to travel dir
+  ctx.drawImage(spr.img, -w/2, -h/2, w, h);
+  ctx.restore();
+}
+
+function drawPlane(p){
+  if (!p || !spritesReady) return;
+  const spr = p.side===0 ? sprites.p1 : sprites.p2;
+  const s = cfg.planeSize * 1.6;
+
+  // invulnerability blink
+  if (p.invuln > 0 && Math.floor(p.invuln*10)%2===0) return;
+
+  drawSprite(spr, p.x, p.y, s, s, p.angle);
+
+  // shield bubble
+  if (p.shield > time){
+    const prog = Math.sin(time*6)*0.5 + 0.5;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(51,230,255,' + (0.4+prog*0.4) + ')';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, s*0.65, 0, Math.PI*2);
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(51,230,255,0.06)';
+    ctx.fill();
+    // radial shimmer
+    const sg = ctx.createRadialGradient(p.x, p.y, s*0.3, p.x, p.y, s*0.7);
+    sg.addColorStop(0, 'rgba(51,230,255,0)');
+    sg.addColorStop(1, 'rgba(51,230,255,' + (0.1+prog*0.15) + ')');
+    ctx.fillStyle = sg;
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // speed boost aura
+  if (p.speed > time){
+    ctx.save();
+    ctx.strokeStyle = 'rgba(91,255,122,0.35)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, s*0.72, 0, Math.PI*2);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function drawBullets(){
+  for (const b of bullets){
+    if (!b.alive) continue;
+    const spr = b.side===0 ? sprites.b1 : sprites.b2;
+    const ang = Math.atan2(b.vy, b.vx);
+    drawSprite(spr, b.x, b.y, 18, 30, ang);
+  }
+}
+
+function drawPowerUps(){
+  for (const pu of powerups){
+    if (!pu.alive) continue;
+    const spr = sprites[pu.type] || sprites.rapid;
+    const bobY = Math.sin(pu.bob) * 6;
+    const s = 44 + Math.sin(pu.spin*2)*4;
+    // glow halo
+    const col = pu.type==='rapid' ? '255,217,77' : pu.type==='shield' ? '51,230,255' : '91,255,122';
+    ctx.save();
+    ctx.shadowColor = 'rgba(' + col + ',0.8)';
+    ctx.shadowBlur = 18;
+    ctx.drawImage(spr.img, pu.x-s/2, pu.y+bobY-s/2, s, s);
+    ctx.restore();
+    // rotating ring
+    ctx.save();
+    ctx.strokeStyle = 'rgba(' + col + ',0.35)';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([6, 8]);
+    ctx.lineDashOffset = -pu.spin*20;
+    ctx.beginPath();
+    ctx.arc(pu.x, pu.y+bobY, s*0.7, 0, Math.PI*2);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function drawParticles(){
+  for (const p of particles){
+    const alpha = 1 - (p.t / p.dur);
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, alpha);
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size * alpha, 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+function drawEffects(){
+  for (const e of effects){
+    const prog = e.t / e.dur;
+    ctx.save();
+    if (e.type === 'text'){
+      ctx.globalAlpha = Math.max(0, 1 - prog);
+      ctx.fillStyle = e.color;
+      ctx.font = 'bold ' + e.size + 'px system-ui';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(e.txt, e.x, e.y);
+    } else if (e.type === 'ring'){
+      ctx.globalAlpha = Math.max(0, 1 - prog);
+      ctx.strokeStyle = e.color;
+      ctx.lineWidth = 3*(1-prog) + 1;
+      ctx.beginPath();
+      ctx.arc(e.x, e.y, 20 + prog*70, 0, Math.PI*2);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+}
+
+function drawHUD(){
+  const pad = 20;
+  ctx.save();
+  ctx.textBaseline = 'top';
+
+  // P1 HUD (left)
+  ctx.fillStyle = '#22e6ff';
+  ctx.font = 'bold 11px system-ui';
+  ctx.textAlign = 'left';
+  ctx.fillText('PLAYER 1', pad, pad);
+  ctx.font = 'bold 26px system-ui';
+  ctx.fillText(score[0], pad, pad+14);
+  // HP pips
+  drawHPPips(planes[0], pad, pad+46, '#22e6ff', 'rgba(239,83,80,1)');
+  // active buffs
+  drawBuffs(planes[0], pad, pad+62, '#22e6ff');
+
+  // P2 HUD (right)
+  ctx.fillStyle = '#ff4fd8';
+  ctx.textAlign = 'right';
+  ctx.font = 'bold 11px system-ui';
+  ctx.fillText('PLAYER 2', W-pad, pad);
+  ctx.font = 'bold 26px system-ui';
+  ctx.fillText(score[1], W-pad, pad+14);
+  drawHPPips(planes[1], W-pad, pad+46, '#ff4fd8', 'rgba(239,83,80,1)', true);
+  drawBuffs(planes[1], W-pad, pad+62, '#ff4fd8', true);
+
+  // Round indicator (center)
+  ctx.textAlign = 'center';
+  ctx.fillStyle = 'rgba(255,255,255,0.4)';
+  ctx.font = 'bold 14px system-ui';
+  ctx.fillText('ROUND ' + (round||1), W/2, pad);
+
+  ctx.restore();
+}
+
+function drawHPPips(p, x, y, color, emptyColor, right){
+  if (!p) return;
+  const n = 4; // max HP
+  const sp = 22;
+  for (let i=0;i<n;i++){
+    const filled = i < p.hp;
+    const px = right ? x - i*sp : x + i*sp;
+    ctx.fillStyle = filled ? color : (p.invuln>0 ? 'rgba(255,255,255,0.15)' : 'rgba(239,83,80,0.8)');
+    ctx.beginPath();
+    ctx.arc(px, y, 6, 0, Math.PI*2);
+    ctx.fill();
+  }
+}
+
+function drawBuffs(p, x, y, color, right){
+  if (!p) return;
+  let label = '';
+  if (p.rapid>0) label += '⚡';
+  if (p.shield > time) label += '◈';
+  if (p.speed > time) label += '»';
+  if (label){
+    ctx.fillStyle = color;
+    ctx.font = '14px system-ui';
+    ctx.textAlign = right ? 'right' : 'left';
+    ctx.fillText(label, x, y);
+  }
+}
+
+function drawPauseOverlay(){
+  ctx.save();
+  ctx.fillStyle = 'rgba(3,5,10,0.75)';
+  ctx.fillRect(0,0,W,H);
+  ctx.fillStyle = '#fff';
+  ctx.textAlign = 'center';
+  ctx.font = 'bold 28px system-ui';
+  ctx.fillText('PAUSED', W/2, H/2-10);
+  ctx.font = '15px system-ui';
+  ctx.fillStyle = 'rgba(255,255,255,0.7)';
+  ctx.fillText('Press P or Esc to resume', W/2, H/2+24);
+  ctx.restore();
+}
+
+/* --- Main render --- */
+function render(){
+  ctx.save()
+  // screen shake
+  if (shake>0){
+    ctx.translate((Math.random()-0.5)*shake*14, (Math.random()-0.5)*shake*14);
+  }
+  drawBackground();
+  drawPowerUps();
+  drawBullets();
+  drawParticles();
+  for (const p of planes){ if (p && !p.dead) drawPlane(p); }
+  for (const p of planes){ if (p && p.dead) drawPlane(p); } // dead planes still drawn (exploding)
+  drawEffects();
+  ctx.restore();
+  drawHUD();
+
+  if (gameState === 'paused') drawPauseOverlay();
+
+  // subtle scanline overlay for polish
+  ctx.save();
+  ctx.globalAlpha = 0.04;
+  ctx.fillStyle = '#000';
+  for (let y=0; y<H; y+=3){ ctx.fillRect(0,y,W,1); }
+  ctx.restore();
+}
+
+/* 9. GAME LOOP ------------------------------------------------------- */
+let lastTimestamp = 0;
+function gameLoop(ts){
+  requestAnimationFrame(gameLoop);
+  const secs = ts/1000;
+  if (!lastTimestamp) lastTimestamp = secs;
+  let dt = secs - lastTimestamp;
+  lastTimestamp = secs;
+  if (dt > 0.1) dt = 0.1; // clamp huge frames (tab background)
+  update(dt);
+  render();
+}
+
+/* 10. MENU / BUTTON HANDLERS ------------------------------------- */
+$('startBtn').addEventListener('click', () => {
+  autoplay = !!document.getElementById('switch-autoplay').checked;
+  hideAllOverlays();
+  gameState = 'playing';
+  score = [0,0];
+  startRound(true);
+  if (bgCanvas) bgCanvas = null; // rebuild for new size
+});
+const _autoSwitch = document.getElementById('switch-autoplay');
+if (_autoSwitch) _autoSwitch.addEventListener('change', updateAutoplayLabel);
+
+$('controlsBack').addEventListener('click', () => {
+  hideAllOverlays();
+  showOverlay('startScreen');
+  gameState = 'menu';
+});
+
+$('rematchBtn').addEventListener('click', () => {
+  hideAllOverlays();
+  gameState = 'playing';
+  score = [0,0];
+  startRound(true);
+});
+
+$('menuBtn').addEventListener('click', () => {
+  hideAllOverlays();
+  showOverlay('startScreen');
+  gameState = 'menu';
+  score = [0,0];
+  bullets = []; powerups = []; particles = [];
+});
+
+// Add a way to access controls from the start screen: clicking the subtitle area
+$('startScreen').querySelector('.subtitle').addEventListener('click', () => {
+  hideOverlay('startScreen');
+  showOverlay('controlsScreen');
+});
+$('startScreen').querySelector('.subtitle').title = 'Show controls';
+$('startScreen').querySelector('.subtitle').style.cursor = 'pointer';
+$('startScreen').querySelector('.subtitle').style.textDecoration = 'underline';
+
+// Also a back-to-controls from the pause won't exist; instead from menu we can reopen:
+// (kept minimal)
+
+/* 11. INIT ------------------------------------------------------------ */
+resize();
+lastT = performance.now()/1000;
+requestAnimationFrame(gameLoop);
+
+</script>
+</body>
+</html>
+

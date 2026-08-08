@@ -1,0 +1,1169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>BOSS RAID — Neon Dreadnought Showdown</title>
+<style>
+  /* BOSS RAID - Neon War Aesthetics - all inline, no external files */
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { height:100%; overflow:hidden;
+    background:#05060f; color:#cfe9ff;
+    font-family:'Segoe UI',system-ui,-apple-system,sans-serif;
+    -webkit-user-select:none; user-select:none; touch-action:manipulation;
+  }
+  #wrap { position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+    background:radial-gradient(1200px 800px at 50% 30%, #0b1030 0%, #05060f 70%);
+  }
+  .panel-title { color:#eaffff; text-shadow:0 0 20px #39c0ff; font-size:clamp(22px,6vw,44px); font-weight:900; letter-spacing:4px; }
+  #game-wrap { position:relative; width:min(98vw, calc(96vh * 0.6)); aspect-ratio:0.6/1; }
+  canvas { position:absolute; inset:0; width:100%; height:100%;
+    display:block; background:#070a18; border-radius:12px;
+    box-shadow:0 0 60px rgba(40,80,255,0.25), 0 0 10px rgba(120,255,255,0.15);
+    cursor:crosshair; }
+  .overlay { position:absolute; inset:0; pointer-events:none;
+    display:flex; font-size:clamp(10px,1.6vw,14px); }
+  #hud { flex-direction:column; justify-content:space-between; padding:2.2%; }
+  .hud-row { display:flex; justify-content:space-between; width:100%; align-items:flex-start; }
+  .bar { height:10px; background:rgba(255,255,255,0.08); border-radius:5px;
+    border:1px solid rgba(255,255,255,0.25); overflow:hidden; }
+  .bar > i { display:block; height:100%; width:100%; transition:width .15s linear; }
+  #player-wrap { width:34%; }
+  #player-wrap .lbl { font-size:.8em; letter-spacing:1px; margin-bottom:2px; opacity:.8; }
+  #hp-bar > i { background:linear-gradient(90deg,#ff5a5a,#ffd16a); box-shadow:0 0 8px #ff6a5a; }
+  #shield-bar { height:6px; margin-top:3px; }
+  #shield-bar > i { background:linear-gradient(90deg,#39d0ff,#a06bff); box-shadow:0 0 8px #39c0ff; }
+  #boss-panel { position:absolute; left:0; right:0; top:2.2%; color:#fff; }
+  #boss-name { text-align:center; font-size:clamp(11px,1.8vw,16px); letter-spacing:3px;
+    color:#ff9a5a; text-shadow:0 0 12px #ff6a3a, 0 0 30px #ff3a3a; font-weight:700; }
+  #boss-bar-wrap { width:70%; margin:6px auto 0; }
+  #boss-bar { height:12px; }
+  #boss-bar > i { background:linear-gradient(90deg,#ff3a3a,#ff9a5a,#ff5ad1); box-shadow:0 0 12px #ff5a5a; }
+  #phase-indicator { text-align:center; margin-top:5px; font-size:clamp(9px,1.4vw,12px);
+    color:#8fd6ff; letter-spacing:3px; opacity:.9; }
+  #phase-indicator b { color:#ffe58a; }
+  #wave-indicator { position:absolute; left:0; right:0; top:30%; text-align:center;
+    font-size:clamp(18px,5vw,40px); font-weight:800; letter-spacing:6px; color:#eaffff;
+    text-shadow:0 0 20px #39c0ff, 0 0 60px #0055ff; opacity:0; transition:opacity .5s;
+    pointer-events:none; }
+  #score { text-align:right; text-shadow:0 0 8px rgba(120,255,255,.5); }
+  #score small { display:block; opacity:.6; letter-spacing:2px; }
+  #score b { font-size:clamp(13px,2.4vw,20px); color:#fff; }
+  #fullscreen { position:absolute; right:1.5%; bottom:1.5%; pointer-events:auto;
+    background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.3); color:#cfe9ff;
+    border-radius:8px; padding:6px 10px; font-size:12px; cursor:pointer; z-index:5; }
+  #fullscreen:hover { background:rgba(255,255,255,.2); }
+  .screen { position:absolute; inset:0; pointer-events:auto; z-index:60;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    text-align:center; padding:8%;
+    background:radial-gradient(900px 700px at 50% 20%, rgba(10,16,45,.92) 0%, rgba(4,6,18,.98) 78%);
+    transition:opacity .45s ease, visibility .45s ease; }
+  .screen.hidden { opacity:0; visibility:hidden; pointer-events:none; }
+  .screen h1 { font-size:clamp(24px,7vw,54px); letter-spacing:6px; color:#eaffff;
+    text-shadow:0 0 24px #39c0ff, 0 0 80px #0055ff; font-weight:900; }
+  .screen h1 span.hot { color:#ff7a5a; text-shadow:0 0 24px #ff3a3a; }
+  .screen .sub { margin-top:6px; letter-spacing:3px; opacity:.8; font-size:clamp(10px,2vw,14px); color:#9ad6ff; }
+  .screen p { margin-top:14px; max-width:46ch; line-height:1.55; opacity:.85;
+    font-size:clamp(11px,2vw,14px); color:#bfe2ff; }
+  .btn { pointer-events:auto; margin-top:22px; padding:14px 30px; cursor:pointer;
+    font-size:clamp(14px,2.6vw,18px); letter-spacing:2px; font-weight:700; color:#fff;
+    background:linear-gradient(90deg,#0a3550,#0a2040); border:1px solid #39c0ff; border-radius:10px;
+    box-shadow:0 0 18px rgba(57,192,255,.4), inset 0 0 12px rgba(57,192,255,.25);
+    transition:transform .12s, box-shadow .12s; }
+  .btn:hover { transform:translateY(-2px); box-shadow:0 0 30px rgba(57,192,255,.7), inset 0 0 18px rgba(57,192,255,.4); }
+  .btn:active { transform:translateY(1px); }
+  .btn.alt { background:linear-gradient(90deg,#3a1050,#200a40); border-color:#c06bff;
+    box-shadow:0 0 18px rgba(192,107,255,.35); font-size:clamp(12px,2vw,15px); }
+  .keys { margin-top:16px; display:flex; gap:10px; flex-wrap:wrap; justify-content:center; opacity:.75; }
+  #gameover .big, #victory .big { font-size:clamp(28px,8vw,60px); color:#ff5a5a;
+    text-shadow:0 0 30px #ff3a3a,0 0 90px #ff0000; font-weight:900; letter-spacing:6px; }
+  #intro-canvas, #start-canvas { position:absolute; inset:0; z-index:0; pointer-events:none; }
+  .stack { position:relative; z-index:2; }
+  .vid-ctrl { position:relative; margin:24px auto 0; width:70%; height:6px;
+    background:rgba(255,255,255,.12); border-radius:3px; z-index:2; }
+  .vid-ctrl i { display:block; height:100%; width:0%; background:#39c0ff; border-radius:3px; box-shadow:0 0 8px #39c0ff; transition:width .1s linear; }
+  #skip-intro { position:absolute; right:15px; top:14px; pointer-events:auto; background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.35); color:#ddd; padding:6px 12px; border-radius:6px; cursor:pointer; font-size:12px; z-index:3; }
+  @media (hover:hover) { #touch { display:none; } }
+  #hint { position:absolute; left:0; right:0; bottom:8%; text-align:center; font-size:clamp(9px,1.6vw,12px); opacity:.55; color:#8fd0ff;
+    pointer-events:none; z-index:58; }
+</style>
+</head>
+<body>
+<div id="wrap">
+<div id="game-wrap">
+  <canvas id="game" width="600" height="1000"></canvas>
+
+  <!-- HUD -->
+  <div class="overlay" id="hud">
+    <div class="hud-row">
+      <div id="player-wrap">
+        <div class="lbl">FIGHTER</div>
+        <div class="bar" id="hp-bar"><i></i></div>
+        <div class="bar" id="shield-bar"><i></i></div>
+      </div>
+      <div id="score"><b id="score-val">0</b><small>SCORE</small></div>
+    </div>
+  </div>
+  <div id="boss-panel" style="display:none">
+    <div id="boss-name">GRAVEHOLD <span style="color:#9ad6ff">THE DREADNOUGHT</span></div>
+    <div id="boss-bar-wrap"><div class="bar" id="boss-bar"><i></i></div></div>
+    <div id="phase-indicator">PHASE <b id="phase-num">1</b> &nbsp;·&nbsp; <span id="phase-name">Breach Wall</span></div>
+  </div>
+  <div class="overlay" id="touch"></div>
+  <div id="hint">⬅ ➡ / A D move &nbsp;·&nbsp; SPACE shoot &nbsp;·&nbsp; SHIFT shield &nbsp;·&nbsp; P pause &nbsp;·&nbsp; M mute</div>
+  <button id="fullscreen">&#x26F6;</button>
+
+  <!-- Start Screen -->
+  <div class="screen" id="start">
+    <canvas id="start-canvas" width="600" height="1000"></canvas>
+    <div class="stack">
+      <h1>BOSS <span class="hot">RAID</span></h1>
+      <div class="sub">NEON DREADNOUGHT SHOWDOWN</div>
+      <p>Pilot the experimental <b>SV-9 PHANTOM</b> against the leviathan warship
+        <b>GRAVEHOLD</b>. Smash through <b>4 phases</b> of escalating fury &mdash; spread
+        volleys, bullet rings, aimed barrages and its shielded core. Shatter the weak point
+        to win.</p>
+      <button class="btn" id="btn-play">&#9654; LAUNCH</button>
+      <button class="btn alt" id="btn-autoplay">&#129302; AUTOPLAY DEMO</button>
+      <div class="keys">Move: &#11013;&#10145; / A D &nbsp;&#8226;&nbsp; Shoot: SPACE &nbsp;&#8226;&nbsp; Shield: SHIFT</div>
+    </div>
+  </div>
+
+  <!-- Intro cinematic -->
+  <div class="screen hidden" id="intro">
+    <canvas id="intro-canvas" width="600" height="1000"></canvas>
+    <div class="stack">
+      <h1 style="font-size:clamp(18px,5vw,34px)">MISSION <span class="hot">BRIEFING</span></h1>
+      <p style="max-width:50ch" id="briefing-text"></p>
+      <div class="vid-ctrl"><i id="intro-progress"></i></div>
+    </div>
+    <button id="skip-intro">SKIP &#9654;</button>
+  </div>
+
+  <!-- Game Over -->
+  <div class="screen hidden" id="gameover">
+    <div class="big" id="go-title">DESTROYED</div>
+    <p style="margin-top:10px" id="go-sub">The dreadnought claims another pilot.</p>
+    <p style="font-size:clamp(14px,3vw,22px);margin-top:16px;color:#ffd16a">FINAL SCORE <b id="go-score">0</b></p>
+    <p style="opacity:.6">Phases cleared: <b id="go-phase">0</b> / 4</p>
+    <div style="display:flex;gap:14px;flex-wrap:wrap;justify-content:center">
+      <button class="btn" id="btn-retry">&#8635; RETRY</button>
+      <button class="btn alt" id="btn-menu">MENU</button>
+    </div>
+  </div>
+
+  <!-- Victory -->
+  <div class="screen hidden" id="victory">
+    <div class="big" style="color:#7aff9a;text-shadow:0 0 30px #39ff7a,0 0 90px #00ff66">VICTORY</div>
+    <p style="margin-top:10px">GRAVEHOLD is destroyed. The skies are yours.</p>
+    <p style="font-size:clamp(14px,3vw,22px);margin-top:16px;color:#7affd0">FINAL SCORE <b id="vic-score">0</b></p>
+    <div style="display:flex;gap:14px;flex-wrap:wrap;justify-content:center">
+      <button class="btn" id="btn-play-again">&#9654; PLAY AGAIN</button>
+      <button class="btn alt" id="btn-menu2">MENU</button>
+    </div>
+  </div>
+</div>
+</div>
+
+<script>
+"use strict";
+/* =============================================================================
+   BOSS RAID -- single-file boss-battle shoot-em-up.
+   Inline SVG assets, canvas + requestAnimationFrame, no external files.
+   ============================================================================= */
+const $ = id => document.getElementById(id);
+const canvas = $('game');
+const ctx = canvas.getContext('2d');
+const W = 600, H = 1000;                 // logical canvas size (portrait)
+const DPR = Math.min(window.devicePixelRatio || 1, 2);
+
+const PX = W / 2;                        // player default x
+const PY = H - 130;                      // player default y
+
+
+function fitCanvas(){
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.width = W*dpr; canvas.height = H*dpr;
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+}
+fitCanvas();
+window.addEventListener('resize', fitCanvas);
+
+/* ---------------------------------------------------------------------------
+   AUDIO - procedural WebAudio SFX (no files).
+--------------------------------------------------------------------------- */
+let audioCtx=null, muted=false;
+function initAudio(){
+  if(!audioCtx){ try{ audioCtx=new(window.AudioContext||window.webkitAudioContext)(); }catch(e){} }
+  if(audioCtx && audioCtx.state==='suspended') audioCtx.resume();
+}
+function sfx(type){
+  if(!audioCtx||muted) return;
+  const t=audioCtx.currentTime, osc=audioCtx.createOscillator(), g=audioCtx.createGain();
+  osc.connect(g); g.connect(audioCtx.destination);
+  let f0=440,f1=440,d=0.1,v=0.06, shape='square';
+  switch(type){
+    case 'shoot':   f0=880;  f1=180; d=0.09; v=0.045; break;
+    case 'enemyHit':f0=260;  f1=95;  d=0.10; v=0.06;  break;
+    case 'explode': f0=140;  f1=30;  d=0.6;  v=0.20;  shape='sawtooth'; break;
+    case 'hit':     f0=300;  f1=60;  d=0.18; v=0.12;  break;
+    case 'shield':  f0=520;  f1=820; d=0.25; v=0.08;  break;
+    case 'charge':  f0=120;  f1=420; d=0.5;  v=0.08;  shape='triangle'; break;
+    case 'minion':  f0=500;  f1=380; d=0.08; v=0.03;  break;
+    case 'phase':   f0=220;  f1=220; d=0.9;  v=0.14;  shape='square';
+      g.gain.setValueAtTime(0.001,t);
+      g.gain.exponentialRampToValueAtTime(v,t+0.02);
+      g.gain.exponentialRampToValueAtTime(0.001,t+d); break;
+  }
+  osc.type=shape;
+  osc.frequency.setValueAtTime(f0,t);
+  osc.frequency.exponentialRampToValueAtTime(f1,t+d);
+  g.gain.setValueAtTime(0.001,t);
+  g.gain.exponentialRampToValueAtTime(v,t+0.01);
+  g.gain.exponentialRampToValueAtTime(0.001,t+d);
+  osc.start(t); osc.stop(t+d+0.02);
+}
+
+/* ---------------------------------------------------------------------------
+   INLINE SVG ASSETS (data URIs - fully self contained)
+--------------------------------------------------------------------------- */
+const SVG=(w,h,inner)=> 'data:image/svg+xml;utf8,'+encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'">'+inner+'</svg>');
+const IMG={};
+function loadImg(key,w,h,inner){ IMG[key]={img:new Image(),w,h}; IMG[key].img.src=SVG(w,h,inner); }
+
+/* --- PLAYER: SV-9 PHANTOM fighter --- */
+loadImg('player',120,120,`
+<defs>
+ <linearGradient id="b" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#3a60ff"/><stop offset="1" stop-color="#cfe4ff"/></linearGradient>
+ <linearGradient id="w" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#39e0ff"/><stop offset="1" stop-color="#0069ff"/></linearGradient>
+ <radialGradient id="eng" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#fff"/><stop offset=".35" stop-color="#4de0ff"/><stop offset="1" stop-color="rgba(40,120,255,0)"/></radialGradient>
+ <filter id="glow"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+</defs>
+<ellipse cx="60" cy="102" rx="20" ry="20" fill="url(#eng)"/>
+<g fill="url(#w)" stroke="#aef4ff" stroke-width="1.5">
+ <path filter="url(#glow)" d="M60 58 L14 92 L34 94 L52 82 L52 92 L40 108 L82 108 L70 92 L70 82 L88 94 L108 92 Z"/>
+</g>
+<circle cx="22" cy="96" r="4" fill="#0a2a55" stroke="#4de0ff"/><circle cx="100" cy="96" r="4" fill="#0a2a55" stroke="#4de0ff"/>
+<g stroke="#bfe9ff" stroke-width="1.2">
+ <path fill="url(#b)" d="M60 10 L78 40 L78 74 L96 98 L60 108 L24 98 L42 74 L42 40 Z"/>
+</g>
+<ellipse cx="60" cy="42" rx="11" ry="20" fill="#0a2a55" stroke="#4de0ff" stroke-width="1.5"/>
+<ellipse cx="60" cy="34" rx="7" ry="10" fill="#aef4ff" opacity=".6"/>
+<circle cx="60" cy="12" r="3" fill="#ffe58a"/>
+<path fill="#0069ff" d="M42 74 L30 92 L40 92 L48 82 Z"/><path fill="#0069ff" d="M78 74 L92 92 L82 92 L74 82 Z"/>`);
+
+/* --- PLAYER BULLET --- */
+loadImg('pbullet',28,28,`
+<defs><linearGradient id="pb" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#00c8ff"/><stop offset="1" stop-color="#fff"/></linearGradient></defs>
+<ellipse cx="14" cy="14" rx="3" ry="12" fill="none" stroke="rgba(0,200,255,.5)" stroke-width="1"/>
+<ellipse cx="14" cy="14" rx="2.5" ry="11" fill="url(#pb)" stroke="#aef4ff"/><circle cx="14" cy="4" r="1.5" fill="#fff"/>`);
+
+/* --- ENEMY BULLET --- */
+loadImg('ebullet',26,26,`
+<defs><radialGradient id="eb" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#fff"/><stop offset=".4" stop-color="#ff9a3a"/><stop offset="1" stop-color="rgba(255,40,40,0)"/></radialGradient></defs>
+<circle cx="13" cy="13" r="5" fill="url(#eb)"/><circle cx="13" cy="13" r="5" fill="#ff4a6a" stroke="#ffd16a" stroke-width="1"/>`);
+
+/* --- BOSS dreadnought: GRAVEHOLD --- */
+loadImg('boss',360,220,`
+<defs>
+ <linearGradient id="hull" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a3550"/><stop offset=".5" stop-color="#141a30"/><stop offset="1" stop-color="#05070f"/></linearGradient>
+ <linearGradient id="deck" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#3a4a6a"/><stop offset="1" stop-color="#0e1428"/></linearGradient>
+ <radialGradient id="cor" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#fff"/><stop offset=".4" stop-color="#ff7a5a"/><stop offset="1" stop-color="rgba(255,40,20,0)"/></radialGradient>
+ <filter id="rglow"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+</defs>
+<ellipse cx="330" cy="150" rx="40" ry="70" fill="rgba(255,90,40,.25)"/>
+<path fill="url(#hull)" stroke="#556a95" stroke-width="2" d="M28 108 L20 96 L24 62 L60 40 L150 26 L260 34 L330 58 L344 92 L340 122 L320 148 L260 168 L120 172 L52 152 L34 128 Z"/>
+<path fill="url(#deck)" opacity=".7" d="M70 58 L150 48 L252 54 L300 70 L300 92 L70 96 Z"/>
+<g stroke="#3a4a6a" stroke-width="1" opacity=".6"><line x1="80" y1="60" x2="80" y2="94"/><line x1="120" y1="54" x2="120" y2="94"/><line x1="170" y1="50" x2="170" y2="94"/><line x1="230" y1="52" x2="230" y2="94"/></g>
+<path fill="#1a2340" stroke="#5a6a95" d="M56 46 L70 68 L70 96 L56 94 Z"/><rect x="58" y="52" width="8" height="6" fill="#8fe0ff"/>
+<path fill="#121a30" stroke="#44507a" d="M150 34 L170 20 L200 22 L204 38 L150 42 Z"/>
+<g fill="#7a8ab5"><circle cx="95" cy="80" r="2.5"/><circle cx="120" cy="80" r="2.5"/><circle cx="145" cy="80" r="2.5"/><circle cx="195" cy="80" r="2.5"/><circle cx="220" cy="80" r="2.5"/><circle cx="260" cy="74" r="2.5"/></g>
+<path fill="#0a1024" stroke="#3a4a6a" d="M40 100 L300 100 L310 120 L290 140 L60 140 L44 120 Z"/>
+<g stroke="#5a6a95" stroke-width="1.5" opacity=".8"><line x1="80" y1="102" x2="80" y2="138"/><line x1="140" y1="102" x2="140" y2="138"/><line x1="255" y1="102" x2="255" y2="138"/></g>
+<g stroke="#5a6a95"><rect x="40" y="60" width="26" height="14" rx="4" fill="#1a2340"/><rect x="28" y="63" width="16" height="8" rx="2" fill="#2a3550"/><rect x="10" y="65" width="22" height="5" fill="#3a4a6a"/><rect x="118" y="102" width="24" height="13" rx="4" fill="#1a2340"/><rect x="100" y="105" width="22" height="7" rx="2" fill="#2a3550"/><rect x="92" y="107" width="26" height="4" fill="#3a4a6a"/><rect x="262" y="60" width="28" height="14" rx="4" fill="#1a2340"/><rect x="250" y="63" width="16" height="8" rx="2" fill="#2a3550"/><rect x="268" y="65" width="22" height="5" fill="#3a4a6a"/></g>
+<g fill="#2a3550" stroke="#5a6a95"><circle cx="50" cy="118" r="8"/><circle cx="170" cy="118" r="8"/><circle cx="280" cy="118" r="8"/></g>
+<g filter="url(#rglow)"><ellipse cx="344" cy="100" rx="10" ry="26" fill="#ff7a3a" opacity=".9"/><ellipse cx="346" cy="100" rx="5" ry="16" fill="#ffd16a" opacity=".9"/></g>
+<circle cx="40" cy="52" r="6" fill="#0a2a55" stroke="#ff5a5a" stroke-width="1.5" filter="url(#rglow)"/>`);
+
+/* --- WEAK POINT core --- */
+loadImg('weak',56,56,`
+<defs><radialGradient id="wc" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#fff"/><stop offset=".35" stop-color="#ffe58a"/><stop offset="1" stop-color="rgba(255,120,40,0)"/></radialGradient></defs>
+<circle cx="28" cy="28" r="17" fill="rgba(255,200,80,.25)"/>
+<circle cx="28" cy="28" r="11" fill="url(#wc)" stroke="#fff3c0" stroke-width="1.5"/>
+<g stroke="#ffd16a" stroke-width="1" opacity=".7"><line x1="28" y1="10" x2="28" y2="14"/><line x1="28" y1="42" x2="28" y2="46"/><line x1="14" y1="28" x2="18" y2="28"/><line x1="38" y1="28" x2="42" y2="28"/></g>`);
+
+/* --- MINION drone --- */
+loadImg('minion',64,64,`
+<defs><linearGradient id="mg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#c06bff"/><stop offset="1" stop-color="#5a1a9a"/></linearGradient></defs>
+<ellipse cx="32" cy="52" rx="12" ry="8" fill="rgba(192,107,255,.25)"/>
+<path fill="url(#mg)" stroke="#dca0ff" stroke-width="1" d="M32 12 L44 30 L44 44 L52 56 L12 56 L20 44 L20 30 Z"/>
+<circle cx="32" cy="22" r="5" fill="#3a1060" stroke="#dca0ff"/><circle cx="32" cy="22" r="2.5" fill="#ff8af0"/>
+<circle cx="18" cy="20" r="3" fill="#ff5ad1"/><circle cx="46" cy="20" r="3" fill="#ff5ad1"/>`);
+
+/* --- EXPLOSION blob (procedurally tinted) --- */
+const _expCache={};
+function explosionImg(seed){
+  if(_expCache[seed.r]) return _expCache[seed.r];
+  const hues=['0,200,255','255,90,60','255,200,80','192,107,255'];
+  const h=hues[seed.r%hues.length], s=64;
+  let inner='<defs><radialGradient id="xp" cx=".5" cy=".5" r=".5">'+
+    '<stop offset="0" stop-color="rgba('+h+',1)"/><stop offset=".4" stop-color="rgba('+h+',.8)"/>'+
+    '<stop offset="1" stop-color="rgba('+h+',0)"/></radialGradient></defs>'+
+    '<circle cx="32" cy="32" r="28" fill="url(#xp)"/>';
+  for(let i=0;i<26;i++){
+    const a=(i/26)*Math.PI*2, r1=6+Math.random()*8, r2=r1+4+Math.random()*6;
+    const x1=32+Math.cos(a)*r1, y1=32+Math.sin(a)*r1, x2=32+Math.cos(a)*r2, y2=32+Math.sin(a)*r2;
+    inner+='<line x1="'+x1.toFixed(1)+'" y1="'+y1.toFixed(1)+'" x2="'+x2.toFixed(1)+'" y2="'+y2.toFixed(1)+'" stroke="rgba('+h+',.9)" stroke-width="2" stroke-linecap="round"/>';
+  }
+  _expCache[seed.r]=SVG(s,s,inner); return _expCache[seed.r];
+}
+
+/* ---------------------------------------------------------------------------
+   UTILITY MATH
+--------------------------------------------------------------------------- */
+const clamp=(v,a,b)=>v<a?a:(v>b?b:v);
+const lerp=(a,b,t)=>a+(b-a)*t;
+const dist=(x1,y1,x2,y2)=>Math.hypot(x2-x1,y2-y1);
+const rand=(a,b)=>a+Math.random()*(b-a);
+function angleTo(x1,y1,x2,y2){ return Math.atan2(y2-y1,x2-x1); }
+function drawImg(key,x,y,scale,rot,alpha){
+  const A=IMG[key];
+  if(!A) return;
+  ctx.save(); ctx.globalAlpha=alpha===undefined?1:alpha;
+  ctx.translate(x,y); if(rot) ctx.rotate(rot);
+  if(scale!==1){ const s=scale/A.w; ctx.scale(s,s); }
+  ctx.drawImage(A.img,-A.w/2,-A.h/2,A.w,A.h); ctx.restore();
+}
+
+/* ---------------------------------------------------------------------------
+   BACKGROUND STARFIELD
+--------------------------------------------------------------------------- */
+class Starfield{
+  constructor(count){
+    this.stars=[];
+    for(let i=0;i<count;i++){
+      this.stars.push({x:Math.random()*W, y:Math.random()*H,
+        r:rand(0.3,2), sp:rand(0.4,2.5), tw:Math.random()*Math.PI*2});
+    }
+  }
+  update(dt){
+    for(const s of this.stars){ s.y+=s.sp*dt*60; if(s.y>H){ s.y=-2; s.x=Math.random()*W; } }
+  }
+  draw(){
+    for(const s of this.stars){
+      ctx.globalAlpha=0.4+0.6*Math.abs(Math.sin(s.tw+=0.02));
+      ctx.fillStyle='#cfe4ff'; ctx.fillRect(s.x,s.y,s.r,s.r);
+    }
+    ctx.globalAlpha=1;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   GAME STATE + PLAYER
+--------------------------------------------------------------------------- */
+let state='menu';            // menu | intro | play | gameover | victory
+let autoplay=false, paused=false;
+let gameTime=0;
+let player=null, boss=null;
+let pBullets=[], eBullets=[], minions=[], particles=[], floatTexts=[];
+let stars=new Starfield(120);
+
+// particle one-shot manager
+function addParticles(x,y,type,count){
+  for(let i=0;i<count;i++){
+    const a=Math.random()*Math.PI*2, sp=rand(30,260);
+    particles.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,
+      life:rand(0.3,0.9), t:0, color:type==='spark'?'#ffd16a':(type==='cyan'?'#39c0ff':'#ff5a5a'),
+      r:rand(1.5,3.5), kind:type});
+  }
+}
+function addFloat(x,y,text,color){
+  floatTexts.push({x,y,text,color,t:0,life:1.1});
+}
+
+class Fighter{
+  constructor(){
+    this.x=PX; this.y=PY; this.baseSpeed=380; this.speed=this.baseSpeed;
+    this.r=18;                 // collision radius
+    this.hp=100; this.maxHp=100;
+    this.shield=40; this.maxShield=40;
+    this.shieldActive=false; this.shieldCharge=0; this.shieldRechargeDelay=0;
+    this.fireTimer=0; this.fireRate=0.14;        // s between shots
+    this.invuln=0; this.down=0; this.tilt=0;
+    this.angle=0; this.targetAngle=0;
+  }
+  reset(){
+    this.x=PX; this.y=PY; this.hp=this.maxHp; this.shield=this.maxShield;
+    this.shieldActive=false; this.invuln=0; this.down=0; this.tilt=0;
+  }
+  update(dt,input){
+    // movement
+    const sp=this.speed*(this.shieldActive?0.55:1);
+    let dx=0;
+    if(input.left) dx-=1;
+    if(input.right) dx+=1;
+    if(input.up) this.y-=sp*dt;
+    if(input.down) this.y+=sp*dt;
+    this.x+=dx*sp*dt;
+    this.x=clamp(this.x,22,W-22);
+    // vertical bounds (stay in lower 70% but allow slight reach up)
+    this.y=clamp(this.y,H*0.42,H-40);
+    // tilt for banking
+    this.targetAngle=dx*0.35;
+    this.angle=lerp(this.angle,this.targetAngle,10*dt);
+    // shield
+    if(input.shield && this.shield>0){ this.shieldActive=true; this.shield-=26*dt; }
+    else { this.shieldActive=false; }
+    if(this.shield<=0){ this.shield=0; this.shieldCharge=1.2; }
+    if(!this.shieldActive && this.shieldCharge>0) this.shieldCharge-=dt;
+    if(this.shieldCharge<=0) this.shield=Math.min(this.maxShield,this.shield+16*dt);
+    // firing
+    this.fireTimer-=dt;
+    if(input.fire && this.fireTimer<=0){
+      // twin cannon
+      pBullets.push({x:this.x-14,y:this.y-26,vx:0,vy:-780,r:6,img:'pbullet'});
+      pBullets.push({x:this.x+14,y:this.y-26,vx:0,vy:-780,r:6,img:'pbullet'});
+      this.fireTimer=this.fireRate; sfx('shoot');
+    }
+    if(this.invuln>0) this.invuln-=dt;
+    if(this.down>0) this.down-=dt;
+  }
+  damage(amount){
+    if(this.invuln>0 || this.down>0) return false;
+    if(this.shieldActive){
+      this.shield-=amount;
+      addParticles(this.x,this.y,'cyan',10);
+      sfx('shield');
+      if(this.shield<=0){ this.shield=0; this.shieldCharge=1.2; this.shieldActive=false;
+        this.invuln=0.6; this.hp-=amount*0.5; }
+      return true;
+    }
+    this.hp-=amount; this.invuln=0.8; addParticles(this.x,this.y,'spark',14); sfx('hit');
+    if(this.hp<=0){ this.hp=0; this.die(); }
+    return true;
+  }
+  heal(a){ this.hp=Math.min(this.maxHp,this.hp+a); }
+  die(){
+    this.down=0.5; addParticles(this.x,this.y,'spark',60); addParticles(this.x,this.y,'boom',30);
+    sfx('explode');
+  }
+  draw(){
+    if(this.down>0) return;
+    if(this.invuln>0 && Math.floor(this.invuln*12)%2===0 && !autoplay){ ctx.globalAlpha=0.4; }
+    drawImg('player',this.x,this.y,0.95,this.angle,this.shieldActive?0.9:1);
+    ctx.globalAlpha=1;
+    if(this.shieldActive){
+      ctx.save();
+      ctx.strokeStyle='#39c0ff'; ctx.globalAlpha=0.5;
+      ctx.shadowColor='#39c0ff'; ctx.shadowBlur=14;
+      ctx.beginPath(); ctx.arc(this.x,this.y,this.r+9,this.angle+0.4,this.angle+2.6); ctx.stroke();
+      ctx.restore();
+    }
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   BOSS - GRAVEHOLD dreadnought with 4-phase AI
+--------------------------------------------------------------------------- */
+class Boss{
+  constructor(){
+    this.img=IMG.boss;
+    this.w=360; this.h=220;
+    this.x=W/2; this.targetY=-100;
+    this.y=-100; this.enterSpeed=0;
+    this.maxHp=5000; this.hp=this.maxHp;
+    this.phase=1;
+    this.alive=true;
+    this.active=this.t=0; this.weakT=-1;
+    this.animT=0;
+    this.aimEase=1; this.angle=0; this.dir=1;
+    this.swaySpeed=0.4; this.swayAmp=40; this.baseX=W/2;
+    this.flash=0; this.talkT=0;
+  }
+  reset(){
+    this.y=-100; this.targetY=-100; this.enterSpeed=0;
+    this.hp=this.maxHp; this.phase=1; this.alive=true; this.active=this.t=0;
+    this.weakT=-1; this.flash=0; this.talkT=0; this.x=W/2; this.baseX=W/2;
+  }
+  isEntering(){ return this.y<this.targetY; }
+  enter(){ this.targetY=150; this.enterSpeed=90; }
+  update(dt){
+    if(!this.alive) return;
+    if(this.isEntering()){
+      this.y+=this.enterSpeed*dt; sfx('phase'); this.enterSpeed*=1.02;
+      if(this.y>=this.targetY){ this.y=this.targetY; this.active=1; }
+      return;
+    }
+    this.active++;
+    this.t+=dt; this.animT+=dt; if(this.flash>0)this.flash-=dt;
+    // gentle horizontal sway around baseX
+    this.baseX+=this.dir*34*dt;
+    if(this.baseX>W*0.62||this.baseX<W*0.38) this.dir*=-1;
+    this.x=this.baseX+Math.sin(this.t*this.swaySpeed)*this.swayAmp;
+    this.x=clamp(this.x,this.w/2,W-this.w/2);
+    // fire the phase pattern
+    this.firePattern(dt);
+    if(this.weakT>=0) this.weakT-=dt;
+  }
+  /* Damage split: during weak-point window take full x4 damage to weak area. */
+  damage(amount, onWeak){
+    if(!this.alive) return;
+    const mult=(onWeak&&this.weakT>0)?4:1;
+    this.hp-=amount*mult;
+    this.flash=0.08;
+    if(onWeak&&this.weakT>0){ addParticles(this.x,this.y-20,'spark',10); }
+    if(this.hp<=0){
+      this.hp=0; this.alive=false;
+      addParticles(this.x,this.y,'boom',80);
+      sfx('explode');
+      scheduleVictory();
+    } else {
+      // phase transitions
+      const frac=this.hp/this.maxHp;
+      let newPhase=1;
+      if(frac<=0.74)newPhase=2;
+      if(frac<=0.48)newPhase=3;
+      if(frac<=0.22)newPhase=4;
+      if(newPhase!==this.phase){
+        this.phase=newPhase;
+        this.enterPhase(newPhase);
+      }
+    }
+  }
+  enterPhase(p){
+    this.weakT=0;          // will open via pattern
+    addParticles(this.x,this.y,'boom',40); sfx('phase');
+    flashText('PHASE '+p+' <span>'+phaseName(p)+'</span>', p);
+    // update HUD immediately
+    $('phase-num').textContent=p;
+    $('phase-name').textContent=phaseName(p);
+  }
+  targetPoint(){
+    // turret aims: point on the ship toward the player
+    return {x:this.x-40, y:this.y+20};
+  }
+    /* ---- ATTACK PATTERNS (called each frame while in a phase's active cycle) -- */
+  /* A lightweight scheduler: register a "rail" (named) with a period; it triggers
+     exactly once per period crossing. Each rail keeps its own countdown so phases
+     can layer several independent attack cadences. */
+  firePattern(dt){
+    const p=this.phase;
+    const px=player?.x||PX, py=player?.y||PY;
+    const tp=this.targetPoint();
+    // rails namespace reset on phase change
+    if(this._railPhase!==p){ this._railPhase=p; this._railT={}; }
+    const R=(key,period,fn)=>{
+      if(this._railT[key]===undefined){ this._railT[key]=0; }
+      this._railT[key]+=dt;
+      if(this._railT[key]>=period){
+        fn();
+        this._railT[key]-=period;
+      }
+    };
+
+    // telegraph: shake + warn right before a burst, then fire
+    switch(p){
+      /* PHASE 1: "Breach Wall" - slow spread volleys + classic spread salvos */
+      case 1:{
+        R('spreadA',0.28,()=>{
+          const n=6, base=-Math.PI/2, spread=0.8;
+          for(let i=0;i<n;i++){
+            const f=n===1?0.5:i/(n-1);
+            const a=base+lerp(-spread/2,spread/2,f)+Math.sin(this.t*3)*0.05;
+            this.shoot(tp.x,tp.y,a,340);
+          }
+          sfx('enemyHit');
+        });
+        R('volleyA',1.05,()=>{
+          const a=angleTo(tp.x,tp.y,px,py);
+          for(let i=-2;i<=2;i++) this.shoot(tp.x,tp.y,a+i*0.12,450);
+          sfx('charge');
+        });
+        // opens weak point every ~8s at start of a wave
+        R('weakOpen',7.0,()=>{ this.weakT=2.5; });
+        break; }
+      /* PHASE 2: "Ring Storm" - rotating bullet rings */
+      case 2:{
+        R('ringB',0.65,()=>{
+          const n=11; for(let i=0;i<n;i++){
+            const a=(i/n)*Math.PI*2 + this.t*0.9;
+            this.shoot(this.x+32,this.y+32,a,270);
+          }
+          sfx('charge');
+        });
+        R('aimB',1.45,()=>{
+          const a=angleTo(tp.x,tp.y,px,py);
+          for(let i=0;i<5;i++) this.shoot(tp.x,tp.y,a+(i-2)*0.10,440);
+        });
+        R('weakOpenB',5.5,()=>{ this.weakT=1.8; });
+        break; }
+      /* PHASE 3: "Swarm Engine" - summons minions + denser fire */
+      case 3:{
+        R('summonC',2.1,()=>{ this.summonMinions(); });
+        R('aimC',0.85,()=>{
+          const a=angleTo(tp.x,tp.y,px,py);
+          for(let i=-2;i<=2;i++) this.shoot(tp.x,tp.y,a+i*0.09,480);
+          sfx('charge');
+        });
+        R('ringC',1.25,()=>{
+          const n=15; for(let i=0;i<n;i++){
+            const a=(i/n)*Math.PI*2 + this.t*1.3;
+            this.shoot(this.x+32,this.y+32,a,340);
+          }
+        });
+        R('weakOpenC',4.2,()=>{ this.weakT=1.5; });
+        break; }
+      /* PHASE 4: "Core Melt-Down" - final stand, constant spiral + fast aim */
+      case 4:{
+        R('spinD',0.38,()=>{
+          const base=this.t*2.4;
+          for(let i=0;i<3;i++){
+            const a=base+i*Math.PI*2/3;
+            this.shoot(this.x+32,this.y+42,a,320);
+          }
+        });
+        R('quickD',0.3,()=>{
+          const a=angleTo(tp.x,tp.y,px,py);
+          this.shoot(tp.x,tp.y,a,560);
+        });
+        R('weakOpenD',3.2,()=>{ this.weakT=1.4; });
+        break; }
+    }
+  }
+  _railPhase=0; _railT={};
+
+  shoot(x,y,angle,speed){
+    eBullets.push({x,y,vx:Math.cos(angle)*speed,vy:Math.sin(angle)*speed,r:6,img:'ebullet'});
+  }
+  summonMinions(){
+    for(let i=-1;i<=1;i++){
+      minions.push(new Minion(this.x+i*80,this.y+70,-25-i*15));
+    }
+    sfx('minion');
+  }
+  weakPointOpen(){
+    // the core is vulnerable for its entire exposure window
+    return this.weakT>0;
+  }
+  weakPoint(){
+    return {x:this.x-20, y:this.y+30};
+  }
+  draw(){
+    if(!this.alive){ return; }
+    const entering=this.isEntering();
+    ctx.save();
+    if(entering){ ctx.globalAlpha=0.6+0.4*Math.sin(this.animT*10); }
+    drawImg('boss',this.x,this.y,1.15,0,1);
+    // weak point core overlay
+    if(this.weakT>0){
+      const wp=this.weakPoint();
+      const pulse=1+0.25*Math.sin(this.animT*10);
+      drawImg('weak',wp.x,wp.y,1*pulse/(IMG.weak?IMG.weak.w:56),0, entering?1:0.95);
+    }
+    // flash when damaged
+    if(this.flash>0){
+      ctx.globalAlpha=this.flash*10*0.4;
+      ctx.globalCompositeOperation='lighter';
+      ctx.fillStyle='#fff';
+      ctx.beginPath(); ctx.arc(this.x,this.y,this.w/2-10,0,Math.PI*2); ctx.fill();
+      ctx.globalCompositeOperation='source-over';
+    }
+    // rotation/slight bob
+    // bullet ring cannons flashing accent when firing
+    ctx.restore();
+  }
+  drawMiniPulse(){
+    // small engine pulse drawn under ship
+  }
+}
+
+function phaseName(p){
+  return ['','Breach Wall','Ring Storm','Swarm Engine','Core Melt-Down'][p]||'';
+}
+
+/* ---------------------------------------------------------------------------
+   MINION DRONE - summoned by phase 3+.
+   Flies down, weaves, and occasionally fires a single aimed shot.
+--------------------------------------------------------------------------- */
+class Minion{
+  constructor(x,y,dx){
+    this.x=x; this.y=y; this.dx=dx; this.r=14; this.img='minion';
+    this.hp=2; this.fireT=rand(0.8,1.6); this.t=Math.random()*6;
+  }
+  update(dt){
+    this.t+=dt;
+    this.y+=90*dt;
+    this.x+=this.dx*dt+Math.sin(this.t*4)*40*dt;
+    this.fireT-=dt;
+    if(this.fireT<=0 && this.y>80 && this.y<H-200){
+      const a=angleTo(this.x,this.y,player.x,player.y);
+      eBullets.push({x:this.x,y:this.y,vx:Math.cos(a)*300,vy:Math.sin(a)*300,r:5,img:'ebullet'});
+      this.fireT=rand(1.2,2.2); sfx('minion');
+    }
+  }
+  draw(){ drawImg('minion',this.x,this.y,0.9,Math.sin(this.t*8)*0.15); }
+  damage(a){
+    this.hp-=a; addParticles(this.x,this.y,'spark',6); sfx('enemyHit'); this.y-=2;
+    if(this.hp<=0){ addParticles(this.x,this.y,'boom',20); sfx('explode'); return true; }
+    return false;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   INPUT - keyboard + touch
+--------------------------------------------------------------------------- */
+const keys={};
+window.addEventListener('keydown',e=>{
+  const k=e.key.toLowerCase();
+  keys[k]=true;
+  if(k==='p'){ if(state==='play'){ paused=!paused; } }
+  if(k==='m'){ muted=!muted; }
+  if(k===' '||k==='arrowup'||k==='arrowdown'||k==='arrowleft'||k==='arrowright') e.preventDefault();
+  initAudio();
+});
+window.addEventListener('keyup',e=>{ keys[e.key.toLowerCase()]=false; });
+
+function readInput(){
+  if(autoplay) return aiInput();
+  const in_={left:false,right:false,up:false,down:false,fire:false,shield:false};
+  in_.left=keys['arrowleft']||keys['a'];
+  in_.right=keys['arrowright']||keys['d'];
+  in_.up=keys['arrowup']||keys['w'];
+  in_.down=keys['arrowdown']||keys['s'];
+  in_.fire=keys[' ']||keys[' '];
+  in_.shield=keys['shift'];
+  return in_;
+}
+
+/* ---- Touch controls (drag to move, hold to fire, toggle shield button) ---- */
+const touchEl=$('touch');
+let touchShieldBtn=null;
+function makeTouchUI(){
+  // shield toggle button
+  touchShieldBtn=document.createElement('div');
+  touchShieldBtn.textContent='\u26A1 SHIELD';
+  touchShieldBtn.style.cssText='position:absolute;right:14px;bottom:80px;width:74px;height:74px;'+
+    'border-radius:50%;background:rgba(57,192,255,.18);border:2px solid #39c0ff;color:#eaffff;'+
+    'display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;'+
+    'pointer-events:auto;z-index:59;touch-action:none;';
+  touchEl.appendChild(touchShieldBtn);
+}
+makeTouchUI();
+// drag to aim/move: track pointer over canvas area
+let dragActive=false, dragX=0, dragY=0, dragShield=false;
+touchEl.addEventListener('pointerdown',e=>{
+  dragActive=true; dragX=e.clientX; dragY=e.clientY;
+  initAudio();
+  touchEl.setPointerCapture(e.pointerId);
+});
+touchEl.addEventListener('pointermove',e=>{
+  if(!dragActive) return;
+  const rect=canvas.getBoundingClientRect();
+  const cx=(e.clientX-rect.left)/rect.width*W;
+  const cy=(e.clientY-rect.top)/rect.height*H;
+  // move player toward finger
+  if(player){ player.x=lerp(player.x,clamp(cx,22,W-22),0.4); player.y=lerp(player.y,clamp(cy,H*0.42,H-40),0.4); }
+  dragShield=false;
+});
+touchEl.addEventListener('pointerup',()=>{ dragActive=false; });
+touchShieldBtn.addEventListener('pointerdown',e=>{ e.stopPropagation(); dragShield=true; initAudio(); });
+touchShieldBtn.addEventListener('pointerup',()=>{ dragShield=false; });
+function touchInput(){
+  if(!dragActive) return {left:false,right:false,up:false,down:false,fire:false,shield:dragShield};
+  return {left:false,right:false,up:false,down:false,fire:true,shield:dragShield};
+}
+
+/* ---------------------------------------------------------------------------
+   AUTOPLAY / DEMO AI - dodges bullets, targets weak point, fights minions.
+--------------------------------------------------------------------------- */
+const ai={
+  aimOK:0, fire:false, cx:PX, cy:PY, useShield:false
+};
+function aiInput(){
+  const in_={left:false,right:false,up:false,down:false,fire:true,shield:ai.useShield};
+  ai.fire=true;
+  // Determine target position: prefer boss weak point when exposed, else boss center,
+  // else advance into range.
+  let tx=PX, ty=PY;
+  if(player && boss && boss.alive){
+    if(boss.weakT>0){ const wp=boss.weakPoint(); tx=wp.x+10; ty=wp.y+50; }
+    else if(boss.y>60){ tx=boss.x; ty=boss.y+60; }
+  }
+  // add slight wandering
+  ai.cx=lerp(ai.cx, tx, 0.5);
+  // DODGE: evaluate nearby enemy bullets and steer away
+  let ddx=0, ddy=0;
+  for(let i=0;i<eBullets.length;i++){
+    const b=eBullets[i];
+    const d=dist(b.x,b.y,player.x,player.y);
+    if(d<120){
+      const push=(140-d)/140;
+      ddx-=(b.x-player.x)/d*push;
+      ddy-=(b.y-player.y)/d*push*1.4;
+      if(push>0.6) ai.useShield=true; else ai.useShield=false;
+    }
+  }
+  const targetX=clamp(ai.cx+ddx*160,24,W-24);
+  const targetY=clamp(ai.cy+ddy*140,H*0.42,H-44);
+  ai.cy=lerp(ai.cy,targetY,0.06);
+  if(player.x<targetX-2) in_.right=true;
+  if(player.x>targetX+2) in_.left=true;
+  if(player.y<ai.cy-2) in_.down=true;
+  if(player.y>ai.cy+2) in_.up=true;
+  ai.useShield=false; // recompute
+  for(const b of eBullets){
+    const d=dist(b.x,b.y,player.x,player.y);
+    if(d<60){ ai.useShield=true; break; }
+  }
+  in_.shield=ai.useShield;
+  return in_;
+}
+
+/* ---------------------------------------------------------------------------
+   COLLISION DETECTION
+--------------------------------------------------------------------------- */
+function circleHit(a,b){ return dist(a.x,a.y,b.x,b.y)<(a.r+b.r); }
+
+function updateCollisions(dt){
+  // player bullets vs boss + minions
+  for(let i=pBullets.length-1;i>=0;i--){
+    const b=pBullets[i];
+    b.y+=b.vy*dt; b.x+=b.vx*dt;
+    if(b.y<-30||b.y>H+30||b.x<-30||b.x>W+30){ pBullets.splice(i,1); continue; }
+    let consumed=false;
+    if(boss && boss.alive){
+      // boss body hitbox (large rectangle)
+      const bw=boss.w*1.15, bh=boss.h*1.0;
+      if(Math.abs(b.x-boss.x)<bw/2 && Math.abs(b.y-boss.y)<bh/2){
+        // weak point check
+        const onWeak = boss.weakPointOpen() &&
+          (Math.abs(b.x-boss.weakPoint().x)<24 && Math.abs(b.y-boss.weakPoint().y)<40);
+        boss.damage(18, onWeak);
+        addParticles(b.x,b.y,'spark',6); sfx('enemyHit');
+        consumed=true;
+      }
+    }
+    if(consumed){ pBullets.splice(i,1); }
+  }
+  // minions vs player bullets
+  for(let i=minions.length-1;i>=0;i--){
+    const m=minions[i];
+    m.update(dt);
+    if(m.y>H+60){ minions.splice(i,1); continue; }
+    for(let j=pBullets.length-1;j>=0;j--){
+      if(circleHit(m,pBullets[j])){
+        pBullets.splice(j,1);
+        if(m.damage(18)){ minions.splice(i,1); addScore(250,'+250'); break; }
+      }
+    }
+  }
+  // enemy bullets vs player
+  for(let i=eBullets.length-1;i>=0;i--){
+    const b=eBullets[i];
+    b.x+=b.vx*dt; b.y+=b.vy*dt;
+    if(b.y<-40||b.y>H+40||b.x<-40||b.x>W+40){ eBullets.splice(i,1); continue; }
+    if(player && player.down<=0 && circleHit(player,b)){
+      eBullets.splice(i,1);
+      player.damage(14);
+    }
+  }
+  // minions colliding with player
+  for(let i=minions.length-1;i>=0;i--){
+    if(player && player.down<=0 && circleHit(player,minions[i])){
+      minions[i].damage(40);
+      if(minions[i].hp<=0) minions.splice(i,1);
+      player.damage(18);
+    }
+  }
+}
+
+// scoring
+let score=0;
+function addScore(n,label){
+  score+=n; $('score-val').textContent=score;
+  if(label && player){ addFloat(player.x,player.y-30,label,'#ffe58a'); }
+}
+
+/* ---------------------------------------------------------------------------
+   PARTICLES + FLOAT TEXT
+--------------------------------------------------------------------------- */
+function updateFx(dt){
+  for(let i=particles.length-1;i>=0;i--){
+    const p=particles[i]; p.t+=dt;
+    p.x+=p.vx*dt; p.y+=p.vy*dt; p.vx*=0.98; p.vy*=0.98;
+    if(p.t>p.life) particles.splice(i,1);
+  }
+  for(let i=floatTexts.length-1;i>=0;i--){
+    const f=floatTexts[i]; f.t+=dt; f.y-=40*dt;
+    if(f.t>f.life) floatTexts.splice(i,1);
+  }
+}
+function drawFx(){
+  for(const p of particles){
+    ctx.globalAlpha=1-p.t/p.life;
+    ctx.fillStyle=p.color;
+    ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fill();
+  }
+  ctx.globalAlpha=1;
+  for(const f of floatTexts){
+    ctx.globalAlpha=1-f.t/f.life;
+    ctx.font='bold 16px sans-serif'; ctx.textAlign='center';
+    ctx.fillStyle=f.color; ctx.shadowColor=f.color; ctx.shadowBlur=8;
+    ctx.fillText(f.text,f.x,f.y); ctx.shadowBlur=0;
+  }
+  ctx.globalAlpha=1;
+}
+
+/* ---------------------------------------------------------------------------
+   HUD + SCREEN MANAGEMENT
+--------------------------------------------------------------------------- */
+function updateHud(){
+  const hpFrac=player?player.hp/player.maxHp:0;
+  const shFrac=player?player.shield/player.maxShield:0;
+  $('hp-bar').firstElementChild.style.width=(hpFrac*100)+'%';
+  $('shield-bar').firstElementChild.style.width=(shFrac*100)+'%';
+  if(boss && boss.alive){
+    $('boss-panel').style.display='block';
+    $('boss-bar').firstElementChild.style.width=(boss.hp/boss.maxHp*100)+'%';
+    const pc=Math.round(boss.hp/boss.maxHp*100);
+    $('boss-bar').firstElementChild.style.background=
+      pc>74?'linear-gradient(90deg,#ff3a3a,#ff9a5a,#ffd16a)':
+      pc>48?'linear-gradient(90deg,#ff3a3a,#ff9a5a,#ff5ad1)':pc>22? 'linear-gradient(90deg,#ff5a3a,#c06bff,#7affff)':'linear-gradient(90deg,#ff3a3a,#ff2a5a,#ff00e0)';
+  } else $('boss-panel').style.display='none';
+}
+function flashText(html, phaseNum){
+  const w=$('wave-indicator');
+  w.innerHTML=html;
+  w.style.transition='none'; w.style.opacity=0;
+  w.offsetHeight; // reflow
+  w.style.transition='opacity .4s'; w.style.opacity=1;
+  clearTimeout(flashText._t);
+  flashText._t=setTimeout(()=>{ w.style.opacity=0; },2200);
+}
+function setScreen(id,show){
+  $('start').classList.toggle('hidden', id!=='start');
+  $('intro').classList.toggle('hidden', id!=='intro');
+  $('gameover').classList.toggle('hidden', id!=='gameover');
+  $('victory').classList.toggle('hidden', id!=='victory');
+}
+
+/* ---------------------------------------------------------------------------
+   GAME SETUP / START
+--------------------------------------------------------------------------- */
+function gameOver(){
+  state='gameover';
+  $('go-score').textContent=score;
+  $('go-phase').textContent=(boss&&boss.alive)?(boss.phase-1):Math.max(1,boss.phase-1);
+  $('go-title').textContent= (player&&player.hp>0)?'ESCAPED':'DESTROYED';
+  $('go-sub').textContent=(player&&player.hp>0)?'The dreadnought flees into the void.' : 'The dreadnought claims another pilot.';
+  setScreen('gameover');
+}
+let vicRecorded=false;
+function scheduleVictory(){
+  if(vicRecorded) return; vicRecorded=true;
+  setTimeout(()=>{ victory(); },900);
+}
+function victory(){
+  state='victory';
+  $('vic-score').textContent=score;
+  setScreen('victory');
+  flashText('VICTORY - DREADNOUGHT DESTROYED','');
+}
+function toMenu(){
+  state='menu'; setScreen('start'); player=null; boss=null;
+  pBullets=[];eBullets=[];minions=[];particles=[];floatTexts=[];
+}
+
+/* ---------------------------------------------------------------------------
+   MAIN GAME LOOP
+--------------------------------------------------------------------------- */
+let last=performance.now();
+function loop(now){
+  requestAnimationFrame(loop);
+  const dt=Math.min(0.05,(now-last)/1000); last=now;
+  stars.update(dt);
+
+  // render background always (even in menus behind screens)
+  ctx.fillStyle='#070a18'; ctx.fillRect(0,0,W,H);
+  stars.draw();
+  // nebula glow
+  const g=ctx.createRadialGradient(W*0.5,H*0.25,0,W*0.5,H*0.25,500);
+  g.addColorStop(0,'rgba(40,60,180,.14)'); g.addColorStop(1,'transparent');
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+
+  if(state==='intro'){
+    // type out the briefing then auto-start
+    introType(dt);
+    updateIntro(dt);
+    drawIntroBackdrop();
+  } else if(state==='play'){
+    if(!paused){
+      gameTime+=dt;
+      const input = (touchActiveCanvas()? touchInput() : (autoplay? aiInput() : readInput()));
+      player.update(dt,input);
+      if(boss) boss.update(dt);
+      updateCollisions(dt);
+      updateFx(dt);
+      updateHud();
+      // minion cleanup done in collisions; stars update above
+
+      // check player death & boss death/hp
+      if(player.down>0 && player.down<=0.01) player.down=0;
+      if(player.hp<=0){
+        player.hp=0;
+        if(state==='play'){ setTimeout(gameOver,600); state='dying'; }
+      }
+      // boss finished entering, show intro banner
+      if(boss && boss.active===1){ flashText('GRAVEHOLD APPROACHING',''); }
+    }
+    // DRAW game world
+    drawGame();
+  } else {
+    // idle menu graphics: draw drifting player + boss silhouettes behind screens
+    drawMenuBackdrop();
+  }
+}
+
+function touchActiveCanvas(){
+  // true if pointer is currently down on the canvas area
+  return dragActive;
+}
+
+function drawMenuBackdrop(){
+  // subtle decorative layer behind start/intro screens (screens have own bg)
+}
+function drawIntroBackdrop(){
+  // starfield already drawn; add a slow drifting dreadnought silhouette behind text
+  const t=(performance.now()/1000);
+  ctx.save();
+  ctx.globalAlpha=0.12;
+  drawImg('boss', W*0.5+Math.sin(t*0.3)*30, H*0.62, 1.5, 0, 1);
+  ctx.restore();
+  // soft glow
+  const g=ctx.createRadialGradient(W/2,H*0.28,0,W/2,H*0.28,420);
+  g.addColorStop(0,'rgba(255,90,60,.08)'); g.addColorStop(1,'transparent');
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+}
+
+function drawGame(){
+  // minions
+  for(const m of minions) m.draw();
+  // boss
+  if(boss) boss.draw();
+  // player bullets
+  for(const b of pBullets) drawImg('pbullet',b.x,b.y,1,0);
+  // enemy bullets
+  for(const b of eBullets) drawImg('ebullet',b.x,b.y,1,0);
+  // player
+  if(player) player.draw();
+  // fx
+  drawFx();
+  // weak point reticle hint when open and autoplay
+  if(autoplay && boss && boss.weakT>0){
+    const wp=boss.weakPoint();
+    ctx.save(); ctx.strokeStyle='#ffe58a'; ctx.globalAlpha=0.5+0.4*Math.sin(performance.now()/80);
+    ctx.beginPath(); ctx.arc(wp.x,wp.y,26,0,Math.PI*2); ctx.stroke(); ctx.restore();
+  }
+  // vignette
+  const v=ctx.createRadialGradient(W/2,H/2,H*0.3,W/2,H/2,H*0.8);
+  v.addColorStop(0,'transparent'); v.addColorStop(1,'rgba(2,3,10,.45)');
+  ctx.fillStyle=v; ctx.fillRect(0,0,W,H);
+}
+
+/* ---------------------------------------------------------------------------
+   INTRO CINEMATIC - typewriter briefing with progress bar
+--------------------------------------------------------------------------- */
+const BRIEFING=[
+  'FLEET COMMAND // EYES ONLY',
+  'TARGET: GRAVEHOLD - THE DREADNOUGHT',
+  '',
+  'A leviathan class warship drifts across our airspace. Its four-phase defense grid scours the sky with spread volleys, rotating bullet rings, and swarms of combat drones.',
+  '',
+  'Pilot the SV-9 PHANTOM. Each phase you chip through its armor, the ship retaliates harder. When its glowing core damper "weak point" pulses open, focus ALL fire there - that core collapses the beast.',
+  '',
+  'Your fighter mounts twin plasma cannons and a regenerating shield. Survive the storm. Shatter the core. Bring GRAVEHOLD DOWN.',
+  '',
+  '--- TASK FORCE NIGHTSHADE ---'
+];
+let introIndex=0, introChar=0, introTimer=0;
+const introTextEl=$('briefing-text'), introProg=$('intro-progress');
+function startIntro(){
+  state='intro';
+  setScreen('intro');
+  introIndex=0; introChar=0; introTextEl.textContent='';
+  introActive=true;
+}
+function updateIntro(dt){
+  if(!introActive) return;
+  const totalChars=BRIEFING.reduce((s,l)=>s+l.length+1,0);
+  let consumed=introIndex;
+  for(let i=0;i<introIndex;i++) consumed+=BRIEFING[i].length+1;
+  const globalChar=consumed+introChar;
+  const idealPerLine=20;
+  introProg.style.width=Math.min(100,globalChar/(totalChars)*100)+'%';
+}
+function introType(dt){
+  if(!introActive) return;
+  introTimer-=dt;
+  if(introTimer<=0){
+    introTimer=0.016;
+    const line=BRIEFING[introIndex];
+    if(introChar<line.length){
+      introChar++;
+      const cur=introTextEl.textContent;
+      introTextEl.textContent=cur+line[introChar-1];
+    } else {
+      if(introIndex<BRIEFING.length-1){
+        introTextEl.textContent+='\n';
+        introIndex++; introChar=0;
+      } else {
+        // done - start game (honor autoplay flag from menu button)
+        introActive=false;
+        startGame(_autoPending);
+      }
+    }
+  }
+}
+let introActive=false;
+
+/* ---------------------------------------------------------------------------
+   EVENTS
+--------------------------------------------------------------------------- */
+$('btn-play').addEventListener('click',()=>{ initAudio(); startIntro(); });
+let _autoPending=false;
+$('btn-autoplay').addEventListener('click',()=>{ initAudio(); _autoPending=true; startIntro(); });
+$('skip-intro').addEventListener('click',()=>{ introActive=false; startGame(_autoPending); _autoPending=false; });
+$('btn-retry').addEventListener('click',()=>{ initAudio(); startGame(false); });
+$('btn-menu').addEventListener('click',()=>{ toMenu(); });
+$('btn-play-again').addEventListener('click',()=>{ initAudio(); startGame(false); });
+$('btn-menu2').addEventListener('click',()=>{ toMenu(); });
+$('fullscreen').addEventListener('click',()=>{
+  if(document.documentElement.requestFullscreen) document.documentElement.requestFullscreen();
+});
+
+function startGame(isAuto){
+  autoplay=_autoPending||isAuto; _autoPending=false;
+  score=0; $('score-val').textContent=0;
+  player=new Fighter();
+  boss=new Boss();
+  pBullets=[]; eBullets=[]; minions=[]; particles=[]; floatTexts=[];
+  gameTime=0; paused=false; vicRecorded=false;
+  $('phase-num').textContent=1; $('phase-name').textContent=phaseName(1);
+  boss.enter();
+  state='play';
+  setScreen('none');
+  updateHud();
+}
+/* --- periodic small burst when idle in menu to feel alive --- */
+setInterval(()=>{ if(state==='menu' && Math.random()<0.3){ addParticles(rand(50,W-50),H+10,'boom',8); } },600);
+
+/* ---------------------------------------------------------------------------
+   BOOT
+--------------------------------------------------------------------------- */
+state='menu'; setScreen('start');
+updateHud();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
